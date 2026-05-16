@@ -1,0 +1,28 @@
+# Build output
+target/
+build/
+out/
+
+# Maven / Gradle
+.mvn/wrapper/maven-wrapper.jar
+.gradle/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Logs
+logs/
+*.log
+
+# Runtime / local config
+.env
+.env.*
+!.env.example
+application-local.yml
+application-local.yaml
+application-*.local.yml
+application-*.local.yaml
+
+# IDE / OS
+.idea/
+*.iml
+.vscode/
+.DS_Store
