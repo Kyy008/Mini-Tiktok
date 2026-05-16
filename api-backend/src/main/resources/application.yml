@@ -1,0 +1,53 @@
+server:
+  port: 8085
+
+spring:
+  application:
+    name: api-backend
+  datasource:
+    url: jdbc:mysql://localhost:3307/mini_tiktok_api?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: mini_tiktok
+    password: mini_tiktok123
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: false
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 120MB
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:9000
+          jwk-set-uri: http://localhost:9000/oauth2/jwks
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    banner: false
+
+logging:
+  level:
+    root: info
+    com.minitiktok.api: debug
+    org.springframework.security: info
+
+video:
+  storage-dir: storage/videos
+
+app:
+  cors:
+    allowed-origins:
+      - http://localhost:5173
+    allowed-methods:
+      - GET
+      - POST
+      - DELETE
+      - OPTIONS
+    allowed-headers:
+      - Content-Type
+      - Authorization

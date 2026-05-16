@@ -20,6 +20,8 @@ application-local.yml
 application-local.yaml
 application-*.local.yml
 application-*.local.yaml
+storage/videos/*
+!storage/videos/.gitkeep
 
 # IDE / OS
 .idea/
