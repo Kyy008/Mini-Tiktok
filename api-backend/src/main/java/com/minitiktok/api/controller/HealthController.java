@@ -2,6 +2,7 @@ package com.minitiktok.api.controller;
 
 import java.util.Map;
 
+import com.minitiktok.api.dto.Result;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -9,7 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class HealthController {
 
     @GetMapping("/health")
-    public Map<String, String> health() {
-        return Map.of("status", "ok");
+    public Result<Map<String, String>> health() {
+        return Result.success(Map.of("status", "ok"));
     }
 }
