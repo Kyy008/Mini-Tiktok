@@ -51,7 +51,7 @@ api-backend:  http://localhost:8085
 
 ### 3.1 负责范围
 
-组员 A 负责 `auth-backend`，实现独立 OAuth2 鉴权服务器。
+组员 A 负责 `auth-backend`，实现本地模拟 OAuth2 鉴权服务器。
 
 参考文档：
 

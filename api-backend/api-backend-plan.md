@@ -19,7 +19,7 @@
 
 ### 2.1 基础技术
 
-- Java 17 或 Java 21
+- Java 17
 - Spring Boot 3.x
 - Spring Web
 - Spring Security 6

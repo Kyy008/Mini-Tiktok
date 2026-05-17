@@ -17,7 +17,7 @@
 
 ### 2.1 基础技术
 
-- Java 17 或 Java 21
+- Java 17
 - Spring Boot 3.5.x
 - Spring Security 6
 - Spring Authorization Server 1.5.x
@@ -532,6 +532,4 @@ spring:
 - 能暴露 JWK 公钥集合。
 - JWT 中包含用户 ID、用户名、scope。
 - `api-backend` 能通过 `issuer-uri` 验证 token。
-- 密码不明文存储。
-- 数据库结构和初始化数据由 Flyway 迁移文件维护。
 - client 配置、OAuth2 流程、token 示例都有文档可用于答辩。
