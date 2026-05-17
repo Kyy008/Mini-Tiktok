@@ -4,7 +4,7 @@
 
 `api-backend` 是 Mini-Tiktok 项目的普通业务后台，负责视频上传、视频播放、推荐视频、点赞、我的视频管理、访问记录、请求日志和接口耗时记录。
 
-本模块不处理账密登录，也不签发 token。它作为 OAuth2 Resource Server，校验 `auth-backend` 签发的 Bearer JWT，并从 JWT 中读取当前用户信息。
+本模块不保存用户密码，也不签发 token。它作为 OAuth2 Resource Server，校验 `auth-backend` 签发的 Bearer JWT，并从 JWT 中读取当前用户信息。登录注册代理由组员 A 负责，边界见 `api-backend/api-backend-login-plan.md`。
 
 核心目标：
 
@@ -58,7 +58,7 @@ spring:
 
 - `auth-backend` 使用私钥签发 JWT。
 - `api-backend` 通过 `issuer-uri` 发现授权服务器元数据和 JWK 公钥。
-- `api-backend` 只验证 token，不保存用户密码，不实现登录注册。
+- `api-backend` 只验证 token，不保存用户密码；登录 URL 生成和注册代理接口由组员 A 负责对接。
 - 当前用户 ID 从 JWT `sub` 读取。
 - 开发环境使用 `http://localhost:8085` 提供业务接口。
 

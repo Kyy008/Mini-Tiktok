@@ -35,13 +35,14 @@ api-backend:  http://localhost:8085
 - 前端通过 OAuth2 Authorization Code + PKCE 登录。
 - `auth-backend` 签发 JWT Access Token。
 - `api-backend` 通过 `issuer-uri=http://localhost:9000` 校验 token。
+- 组员 A 负责登录注册与 OAuth2 对接，包括 `api-backend` 中的登录注册代理接口。
 - 视频格式统一为 `MP4`
 
 ## 2. 总体分工表
 
 | 成员 | 主责模块 | 主要内容 | 联调对象 |
 |---|---|---|---|
-| 组员 A | `auth-backend` | 用户注册登录、OAuth2 授权服务器、JWT/JWK、PKCE 联调 | 组员 B、组员 D |
+| 组员 A | `auth-backend` | 用户注册登录、OAuth2 授权服务器、JWT/JWK、PKCE 联调、`api-backend` 登录注册代理对接 | 组员 B、组员 D |
 | 组员 B | `api-backend` 视频基础 | Resource Server 骨架、视频上传、播放、我的视频、删除 | 组员 A、组员 D |
 | 组员 C | `api-backend` 互动与日志 | 点赞、访问记录、推荐、请求日志、接口耗时 | 组员 B、组员 D |
 | 组员 D | `frontend` | Vue 前端、OAuth2 回调、推荐页、上传页、我的视频页 | 组员 A、组员 B、组员 C |
@@ -57,6 +58,7 @@ api-backend:  http://localhost:8085
 
 ```text
 auth-backend/auth-backend-plan.md
+api-backend/api-backend-login-plan.md
 ```
 
 ### 3.2 核心任务
@@ -83,8 +85,23 @@ auth-backend/auth-backend-plan.md
 - 实现 `GET /login`。
 - 实现 `GET /register`。
 - 实现 `POST /register`。
+- 实现 `POST /api/register`，供 `api-backend` 代理注册时调用。
 - 配置 Spring Security 表单登录。
 - 配置 logout。
+
+`api-backend` 登录注册代理：
+
+- 实现：
+
+```text
+GET  /api/auth/login-url
+POST /api/auth/register
+```
+
+- `/api/auth/login-url` 生成 OAuth2 Authorization Code + PKCE 登录跳转信息。
+- `/api/auth/register` 将注册请求代理到 `auth-backend` 的 `POST /api/register`。
+- `api-backend` 不自建用户表，不保存密码，不签发 access token。
+- 登录后业务接口仍通过 Bearer JWT 访问。
 
 OAuth2 授权服务器：
 
@@ -126,6 +143,8 @@ JWT claims：
 
 与组员 D 联调：
 
+- 前端能调用 `GET /api/auth/login-url` 获取 PKCE 登录跳转信息。
+- 前端能调用 `POST /api/auth/register` 完成注册。
 - 前端点击登录能跳转 `/oauth2/authorize`。
 - 登录成功后能回调 `http://localhost:5173/oauth/callback?code=...`。
 - 前端能用 code + code_verifier 换取 access token。
@@ -141,6 +160,9 @@ JWT claims：
 - 可运行的 `auth-backend`。
 - Flyway 数据库迁移文件。
 - 登录和注册页面。
+- JSON 注册接口。
+- `api-backend` 登录 URL 生成接口。
+- `api-backend` 注册代理接口。
 - 可用的 OAuth2 授权流程。
 - 可用的 JWK 端点。
 - `demo` 测试用户。
@@ -151,6 +173,8 @@ JWT claims：
 - 应用能在 `http://localhost:9000` 启动。
 - 空数据库启动后 Flyway 自动建表。
 - 用户可以注册和登录。
+- `/api/auth/login-url` 无 token 可访问，并返回 PKCE 登录跳转信息。
+- `/api/auth/register` 无 token 可访问，并能代理 `auth-backend` 注册。
 - 密码入库为 BCrypt hash。
 - `/oauth2/jwks` 能返回公钥。
 - 前端能拿到 access token。
@@ -727,4 +751,3 @@ B：配合处理视频删除后推荐和播放逻辑。
 组员 D：负责 Vue 前端、OAuth2 前端流程、推荐页、上传页和我的视频页。
 组长：负责系统架构设计、任务拆分、接口协调、联调验收和答辩材料整合。
 ```
-
