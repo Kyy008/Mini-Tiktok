@@ -16,6 +16,7 @@ const router = createRouter({
       path: '/oauth/callback',
       name: 'oauth-callback',
       component: OAuthCallbackView,
+      meta: { hideTab: true },
     },
     {
       path: '/upload',
