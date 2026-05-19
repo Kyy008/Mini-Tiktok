@@ -184,6 +184,7 @@ GET  /login
 POST /login
 GET  /register
 POST /register
+POST /api/register
 POST /logout
 GET  /users/me
 ```
@@ -194,6 +195,7 @@ GET  /users/me
 - `POST /login`：由 Spring Security 表单登录处理。
 - `GET /register`：展示注册页。
 - `POST /register`：创建用户，密码使用 BCrypt 加密。
+- `POST /api/register`：给 `frontend` SPA 注册表单调用的 JSON 注册接口。
 - `POST /logout`：注销当前 auth server session。
 - `GET /users/me`：返回当前已登录用户基础信息，可选，用于调试和前端展示。
 
@@ -222,6 +224,7 @@ GET  /.well-known/oauth-authorization-server
 ```text
 /login                 permitAll
 /register              permitAll
+/api/register          permitAll
 /assets/**             permitAll
 /oauth2/**             交给 Authorization Server filter chain
 /.well-known/**         permitAll
@@ -312,14 +315,16 @@ security
 1. 实现 `GET /login` 页面。
 2. 实现 `GET /register` 页面。
 3. 实现 `POST /register`。
-4. 配置 Spring Security formLogin。
-5. 配置 logout。
+4. 实现 `POST /api/register` JSON 注册接口，供前端 SPA 直接调用。
+5. 配置 Spring Security formLogin。
+6. 配置 logout。
 
 验收：
 
 - 访问 `/login` 可以看到登录页。
 - 登录成功后进入原本请求的 OAuth2 授权流程。
 - 注册成功后可以登录。
+- 前端 SPA 能调用 `POST /api/register` 完成注册。
 - `/logout` 后 session 失效。
 
 ### 阶段 4：Authorization Server 基础配置

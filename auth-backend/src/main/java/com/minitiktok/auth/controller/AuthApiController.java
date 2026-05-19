@@ -22,7 +22,7 @@ public class AuthApiController {
     private final UserService userService;
 
     /**
-     * 提供给 api-backend 调用的注册接口，注册成功后返回用户基础资料。
+     * 提供给 Vue SPA 直接调用的 JSON 注册接口，注册成功后返回用户基础资料。
      */
     @PostMapping("/register")
     public ResponseEntity<Result<UserProfileResponse>> register(@Valid @RequestBody RegisterRequest request) {

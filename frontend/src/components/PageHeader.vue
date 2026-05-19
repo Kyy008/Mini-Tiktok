@@ -6,8 +6,33 @@
       <router-link to="/upload">发布视频</router-link>
       <router-link to="/my/videos">我的视频</router-link>
     </nav>
+    <div class="auth-actions">
+      <span v-if="isAuthenticated" class="username">{{ user?.username || user?.userId }}</span>
+      <button v-if="isAuthenticated" type="button" @click="logout">退出</button>
+      <template v-else>
+        <router-link to="/register">注册</router-link>
+        <button type="button" :disabled="loading" @click="login">登录</button>
+      </template>
+    </div>
   </header>
 </template>
+
+<script setup lang="ts">
+import { storeToRefs } from 'pinia'
+
+import { useAuthStore } from '../stores/auth'
+
+const authStore = useAuthStore()
+const { isAuthenticated, loading, user } = storeToRefs(authStore)
+
+function login(): void {
+  void authStore.login()
+}
+
+function logout(): void {
+  authStore.logout()
+}
+</script>
 
 <style scoped>
 .page-header {
@@ -29,6 +54,36 @@
   display: flex;
   gap: 16px;
   font-size: 14px;
+}
+
+.auth-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.auth-actions button {
+  min-width: 56px;
+  height: 32px;
+  border: 1px solid #1677ff;
+  border-radius: 6px;
+  color: #ffffff;
+  background: #1677ff;
+  cursor: pointer;
+}
+
+.auth-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.username {
+  max-width: 160px;
+  overflow: hidden;
+  color: #4b5563;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .router-link-active {

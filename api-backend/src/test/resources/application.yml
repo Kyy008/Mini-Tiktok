@@ -12,14 +12,3 @@ spring:
         jwt:
           issuer-uri: http://localhost:9000
           jwk-set-uri: http://localhost:9000/oauth2/jwks
-
-auth-backend:
-  base-url: http://localhost:9000
-
-oauth2:
-  client-id: tiktok-web
-  redirect-uri: http://localhost:5173/oauth/callback
-  scopes:
-    - video:read
-    - video:write
-    - video:like

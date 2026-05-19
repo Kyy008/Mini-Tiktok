@@ -39,17 +39,6 @@ logging:
 video:
   storage-dir: storage/videos
 
-auth-backend:
-  base-url: http://localhost:9000
-
-oauth2:
-  client-id: tiktok-web
-  redirect-uri: http://localhost:5173/oauth/callback
-  scopes:
-    - video:read
-    - video:write
-    - video:like
-
 app:
   cors:
     allowed-origins:

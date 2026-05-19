@@ -35,14 +35,14 @@ api-backend:  http://localhost:8085
 - 前端通过 OAuth2 Authorization Code + PKCE 登录。
 - `auth-backend` 签发 JWT Access Token。
 - `api-backend` 通过 `issuer-uri=http://localhost:9000` 校验 token。
-- 组员 A 负责登录注册与 OAuth2 对接，包括 `api-backend` 中的登录注册代理接口。
+- 登录和注册由 `frontend` 直接对接 `auth-backend`，`api-backend` 不参与登录注册中转。
 - 视频格式统一为 `MP4`
 
 ## 2. 总体分工表
 
 | 成员 | 主责模块 | 主要内容 | 联调对象 |
 |---|---|---|---|
-| 组员 A | `auth-backend` | 用户注册登录、OAuth2 授权服务器、JWT/JWK、PKCE 联调、`api-backend` 登录注册代理对接 | 组员 B、组员 D |
+| 组员 A | `auth-backend` | 用户注册登录、OAuth2 授权服务器、JWT/JWK、PKCE 联调 | 组员 B、组员 D |
 | 组员 B | `api-backend` 视频基础 | Resource Server 骨架、视频上传、播放、我的视频、删除 | 组员 A、组员 D |
 | 组员 C | `api-backend` 互动与日志 | 点赞、访问记录、推荐、请求日志、接口耗时 | 组员 B、组员 D |
 | 组员 D | `frontend` | Vue 前端、OAuth2 回调、推荐页、上传页、我的视频页 | 组员 A、组员 B、组员 C |
@@ -58,7 +58,6 @@ api-backend:  http://localhost:8085
 
 ```text
 auth-backend/auth-backend-plan.md
-api-backend/api-backend-login-plan.md
 ```
 
 ### 3.2 核心任务
@@ -85,23 +84,9 @@ api-backend/api-backend-login-plan.md
 - 实现 `GET /login`。
 - 实现 `GET /register`。
 - 实现 `POST /register`。
-- 实现 `POST /api/register`，供 `api-backend` 代理注册时调用。
+- 实现 `POST /api/register`，供 `frontend` SPA 注册表单直接调用。
 - 配置 Spring Security 表单登录。
 - 配置 logout。
-
-`api-backend` 登录注册代理：
-
-- 实现：
-
-```text
-GET  /api/auth/login-url
-POST /api/auth/register
-```
-
-- `/api/auth/login-url` 生成 OAuth2 Authorization Code + PKCE 登录跳转信息。
-- `/api/auth/register` 将注册请求代理到 `auth-backend` 的 `POST /api/register`。
-- `api-backend` 不自建用户表，不保存密码，不签发 access token。
-- 登录后业务接口仍通过 Bearer JWT 访问。
 
 OAuth2 授权服务器：
 
@@ -143,8 +128,8 @@ JWT claims：
 
 与组员 D 联调：
 
-- 前端能调用 `GET /api/auth/login-url` 获取 PKCE 登录跳转信息。
-- 前端能调用 `POST /api/auth/register` 完成注册。
+- 前端能直接调用 `POST http://localhost:9000/api/register` 完成注册。
+- 前端能生成 `code_verifier`、`code_challenge` 和 `state`。
 - 前端点击登录能跳转 `/oauth2/authorize`。
 - 登录成功后能回调 `http://localhost:5173/oauth/callback?code=...`。
 - 前端能用 code + code_verifier 换取 access token。
@@ -161,8 +146,6 @@ JWT claims：
 - Flyway 数据库迁移文件。
 - 登录和注册页面。
 - JSON 注册接口。
-- `api-backend` 登录 URL 生成接口。
-- `api-backend` 注册代理接口。
 - 可用的 OAuth2 授权流程。
 - 可用的 JWK 端点。
 - `demo` 测试用户。
@@ -173,8 +156,8 @@ JWT claims：
 - 应用能在 `http://localhost:9000` 启动。
 - 空数据库启动后 Flyway 自动建表。
 - 用户可以注册和登录。
-- `/api/auth/login-url` 无 token 可访问，并返回 PKCE 登录跳转信息。
-- `/api/auth/register` 无 token 可访问，并能代理 `auth-backend` 注册。
+- `POST /api/register` 无 token 可访问，支持前端 SPA 直连注册。
+- 前端生成的 PKCE 参数能通过授权服务器校验。
 - 密码入库为 BCrypt hash。
 - `/oauth2/jwks` 能返回公钥。
 - 前端能拿到 access token。
@@ -519,11 +502,13 @@ OAuth2 前端流程：
 - 用 authorization code 换 access token。
 - 保存 access token。
 - 调用 `/api/me` 获取当前用户。
+- 实现 `/register` SPA 注册页，直接调用 `auth-backend` 的 `POST /api/register`。
 
 路由页面：
 
 ```text
 /                  推荐视频页
+/register          SPA 注册页
 /oauth/callback    OAuth2 回调页
 /upload            发布视频页
 /my/videos         我的视频页
@@ -573,6 +558,7 @@ Authorization: Bearer <access_token>
 与组员 A 联调：
 
 - 点击登录能跳转授权服务器。
+- SPA 注册页能直连 `auth-backend` 完成注册。
 - 授权成功后能回到 `/oauth/callback`。
 - 前端能换取 access token。
 
@@ -595,6 +581,7 @@ Authorization: Bearer <access_token>
 
 - 可运行的 Vue 前端项目。
 - OAuth2 登录入口。
+- SPA 注册页。
 - OAuth2 回调页。
 - 推荐视频页。
 - 发布视频页。
@@ -605,6 +592,7 @@ Authorization: Bearer <access_token>
 ### 6.5 验收标准
 
 - 应用能在 `http://localhost:5173` 启动。
+- 能直连 `auth-backend` 完成注册。
 - 能完成 OAuth2 PKCE 登录流程。
 - 登录后能显示当前用户。
 - 能展示推荐视频并播放。
