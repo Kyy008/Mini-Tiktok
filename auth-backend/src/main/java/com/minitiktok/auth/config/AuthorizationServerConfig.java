@@ -7,8 +7,6 @@ import java.security.interfaces.RSAPublicKey;
 import java.time.Duration;
 import java.util.UUID;
 
-import javax.sql.DataSource;
-
 import com.minitiktok.auth.security.AuthUserPrincipal;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
@@ -97,23 +95,21 @@ public class AuthorizationServerConfig {
 
     @Bean
     ApplicationRunner tiktokWebClientSeeder(
-            DataSource dataSource,
             RegisteredClientRepository registeredClientRepository,
             @Value("${app.oauth2.seed-client:true}") boolean seedClient) {
         return args -> {
             if (!seedClient) {
                 return;
             }
-            seedTiktokWebClient(dataSource, registeredClientRepository);
+            seedTiktokWebClient(registeredClientRepository);
         };
     }
 
     @Transactional
-    void seedTiktokWebClient(
-            DataSource dataSource,
-            RegisteredClientRepository registeredClientRepository) {
-        JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
-        jdbcTemplate.update("delete from oauth2_registered_client where client_id = ?", "tiktok-web");
+    void seedTiktokWebClient(RegisteredClientRepository registeredClientRepository) {
+        if (registeredClientRepository.findByClientId("tiktok-web") != null) {
+            return;
+        }
         registeredClientRepository.save(tiktokWebClient());
     }
 
