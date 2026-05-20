@@ -1,1 +1,9 @@
 .DS_Store
+
+# Build outputs
+**/target/
+frontend/dist/
+frontend/node_modules/
+
+# Local test runner overrides
+auth-backend/src/test/resources/mockito-extensions/
