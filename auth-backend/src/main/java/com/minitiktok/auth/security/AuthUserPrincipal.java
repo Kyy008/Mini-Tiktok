@@ -3,10 +3,17 @@ package com.minitiktok.auth.security;
 import java.util.Collection;
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+@JsonTypeInfo(use = JsonTypeInfo.Id.CLASS)
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class AuthUserPrincipal implements UserDetails {
 
     private final Long id;
@@ -14,7 +21,12 @@ public class AuthUserPrincipal implements UserDetails {
     private final String password;
     private final boolean enabled;
 
-    public AuthUserPrincipal(Long id, String username, String password, boolean enabled) {
+    @JsonCreator
+    public AuthUserPrincipal(
+            @JsonProperty("id") Long id,
+            @JsonProperty("username") String username,
+            @JsonProperty("password") String password,
+            @JsonProperty("enabled") boolean enabled) {
         this.id = id;
         this.username = username;
         this.password = password;
@@ -26,6 +38,7 @@ public class AuthUserPrincipal implements UserDetails {
     }
 
     @Override
+    @JsonIgnore
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return List.of(new SimpleGrantedAuthority("ROLE_USER"));
     }
@@ -41,16 +54,19 @@ public class AuthUserPrincipal implements UserDetails {
     }
 
     @Override
+    @JsonIgnore
     public boolean isAccountNonExpired() {
         return true;
     }
 
     @Override
+    @JsonIgnore
     public boolean isAccountNonLocked() {
         return true;
     }
 
     @Override
+    @JsonIgnore
     public boolean isCredentialsNonExpired() {
         return true;
     }

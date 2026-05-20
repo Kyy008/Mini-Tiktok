@@ -5,9 +5,8 @@ import {
   buildAuthorizationUrl,
   exchangeCodeForToken,
   fetchCurrentUser,
-  registerUser,
 } from '../api/auth'
-import type { CurrentUser, RegisterCredentials, UserProfile } from '../api/types'
+import type { CurrentUser } from '../api/types'
 import { createPkceParams } from '../utils/pkce'
 import {
   clearAuthStorage,
@@ -51,15 +50,6 @@ export const useAuthStore = defineStore('auth', {
           state: pkce.state,
         }),
       )
-    },
-    async register(credentials: RegisterCredentials): Promise<UserProfile> {
-      this.error = null
-      try {
-        return await registerUser(credentials)
-      } catch (error) {
-        this.error = authErrorMessage(error)
-        throw new Error(this.error)
-      }
     },
     async handleCallback(code: string, state: string): Promise<CurrentUser> {
       this.loading = true

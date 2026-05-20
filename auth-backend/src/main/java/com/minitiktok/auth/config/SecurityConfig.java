@@ -77,11 +77,11 @@ public class SecurityConfig {
             Converter<Jwt, ? extends AbstractAuthenticationToken> jwtAuthenticationConverter) throws Exception {
         http
                 .cors(Customizer.withDefaults())
-                .csrf(csrf -> csrf.ignoringRequestMatchers("/health", "/api/register"))
+                .csrf(csrf -> csrf.ignoringRequestMatchers("/health"))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/health").permitAll()
-                        .requestMatchers("/login", "/register", "/api/register", "/assets/**").permitAll()
+                        .requestMatchers("/login", "/register", "/assets/**").permitAll()
                         .requestMatchers("/.well-known/**").permitAll()
                         .anyRequest().authenticated())
                 .formLogin(form -> form

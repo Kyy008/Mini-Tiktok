@@ -1,13 +1,7 @@
 import axios from 'axios'
 
 import { apiHttp } from '../utils/http'
-import type {
-  ApiResult,
-  CurrentUser,
-  OAuthTokenResponse,
-  RegisterCredentials,
-  UserProfile,
-} from './types'
+import type { ApiResult, CurrentUser, OAuthTokenResponse } from './types'
 
 const AUTH_BASE_URL = import.meta.env.VITE_AUTH_BASE_URL ?? 'http://localhost:9000'
 const CLIENT_ID = import.meta.env.VITE_CLIENT_ID ?? 'tiktok-web'
@@ -26,9 +20,8 @@ export function buildAuthorizationUrl(params: { codeChallenge: string; state: st
   return url.toString()
 }
 
-export async function registerUser(credentials: RegisterCredentials): Promise<UserProfile> {
-  const response = await axios.post<ApiResult<UserProfile>>(`${AUTH_BASE_URL}/api/register`, credentials)
-  return unwrapResult(response.data)
+export function buildRegisterUrl(): string {
+  return new URL('/register', AUTH_BASE_URL).toString()
 }
 
 export async function exchangeCodeForToken(

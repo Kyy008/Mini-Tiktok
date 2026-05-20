@@ -4,16 +4,6 @@ export interface ApiResult<T> {
   data?: T | null
 }
 
-export interface RegisterCredentials {
-  username: string
-  password: string
-}
-
-export interface UserProfile {
-  id: number
-  username: string
-}
-
 export interface CurrentUser {
   userId: string
   username: string | null

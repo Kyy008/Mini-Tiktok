@@ -10,7 +10,7 @@
       <span v-if="isAuthenticated" class="username">{{ user?.username || user?.userId }}</span>
       <button v-if="isAuthenticated" type="button" @click="logout">退出</button>
       <template v-else>
-        <router-link to="/register">注册</router-link>
+        <a :href="registerUrl">注册</a>
         <button type="button" :disabled="loading" @click="login">登录</button>
       </template>
     </div>
@@ -20,10 +20,12 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
 
+import { buildRegisterUrl } from '../api/auth'
 import { useAuthStore } from '../stores/auth'
 
 const authStore = useAuthStore()
 const { isAuthenticated, loading, user } = storeToRefs(authStore)
+const registerUrl = buildRegisterUrl()
 
 function login(): void {
   void authStore.login()

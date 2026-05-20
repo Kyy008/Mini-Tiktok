@@ -6,7 +6,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -28,15 +27,11 @@ class ApiBackendApplicationTests {
     }
 
     @Test
-    void authProxyEndpointsAreNotPublic() throws Exception {
-        mockMvc.perform(get("/api/auth/login-url"))
-                .andExpect(status().isUnauthorized());
-        mockMvc.perform(post("/api/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"username":"proxy","password":"Secret123"}
-                                """))
-                .andExpect(status().isUnauthorized());
+    void removedAuthProxyEndpointsDoNotExist() throws Exception {
+        mockMvc.perform(get("/api/auth/login-url").with(jwt()))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(post("/api/auth/register").with(jwt()))
+                .andExpect(status().isNotFound());
     }
 
     @Test

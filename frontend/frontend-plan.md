@@ -16,7 +16,7 @@
 - 支持分页查看我的视频。
 - 支持删除自己发布的视频。
 
-登录页面由 `auth-backend` 托管。前端提供登录入口，负责生成 PKCE 参数、跳转授权服务器、处理 OAuth2 回调和维护登录状态；注册采用 SPA 表单直连 `auth-backend` 的 `POST /api/register`。
+登录和注册页面由 `auth-backend` 托管。前端提供登录入口，负责生成 PKCE 参数、跳转授权服务器、处理 OAuth2 回调和维护登录状态；注册入口直接跳转到 `auth-backend` 的 `/register` 页面。
 
 本地端口约定：
 
@@ -250,32 +250,7 @@ emptyMessage          空状态信息
 - 上一个按钮将 `currentIndex - 1`。
 - 当前视频点赞后刷新点赞状态或更新本地展示。
 
-### 5.2 SPA 注册页
-
-```text
-/register
-```
-
-页面组件：
-
-```text
-RegisterView.vue
-```
-
-功能：
-
-- 输入用户名和密码。
-- 直接调用 `auth-backend` JSON 注册接口。
-- 注册成功后提示用户登录。
-- 展示用户名重复、参数错误等注册失败信息。
-
-调用接口：
-
-```text
-POST /api/register      auth-backend
-```
-
-### 5.3 OAuth2 回调页
+### 5.2 OAuth2 回调页
 
 ```text
 /oauth/callback
@@ -305,7 +280,7 @@ POST /oauth2/token       auth-backend
 GET  /api/me             api-backend
 ```
 
-### 5.4 发布视频页
+### 5.3 发布视频页
 
 ```text
 /upload
@@ -341,7 +316,7 @@ file
 title
 ```
 
-### 5.5 我的视频页
+### 5.4 我的视频页
 
 ```text
 /my/videos
@@ -398,7 +373,6 @@ isAuthenticated
 
 ```text
 login()
-register(credentials)
 handleCallback(code, state)
 loadMe()
 logout()
@@ -410,7 +384,6 @@ clear()
 职责：
 
 - 生成 OAuth2 授权跳转地址。
-- 调用 `auth-backend` 完成 SPA 注册。
 - 处理回调换 token。
 - 保存和恢复登录状态。
 - 调用 `/api/me`。
@@ -479,14 +452,12 @@ Authorization: Bearer <access_token>
 
 ```text
 exchangeCodeForToken(code, codeVerifier)
-registerUser(credentials)
 getCurrentUser()
 ```
 
 说明：
 
 - `exchangeCodeForToken` 请求 `auth-backend` 的 `/oauth2/token`。
-- `registerUser` 请求 `auth-backend` 的 `/api/register`。
 - `getCurrentUser` 请求 `api-backend` 的 `/api/me`。
 
 ### 7.3 Video API
@@ -580,18 +551,17 @@ getVideoLikeStatus(id)
 任务：
 
 1. 实现 `authStore.login()`。
-2. 实现 `authStore.register()`，直接调用 `auth-backend /api/register`。
-3. 实现 `/register` SPA 注册页。
-4. 实现 `/oauth/callback` 页面。
-5. 实现 token 换取请求。
-6. 保存 access token。
-7. 调用 `/api/me` 获取当前用户。
-8. 处理回调失败状态。
+2. 实现注册入口跳转到 `auth-backend /register`。
+3. 实现 `/oauth/callback` 页面。
+4. 实现 token 换取请求。
+5. 保存 access token。
+6. 调用 `/api/me` 获取当前用户。
+7. 处理回调失败状态。
 
 验收：
 
 - 点击登录能跳转授权服务器。
-- SPA 注册页能直连 `auth-backend` 完成注册。
+- 点击注册能跳转到 `auth-backend` 注册页面。
 - 授权成功后能回到前端。
 - 前端能保存 access token。
 - 前端能显示当前用户名。
