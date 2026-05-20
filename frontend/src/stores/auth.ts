@@ -57,7 +57,7 @@ export const useAuthStore = defineStore('auth', {
       try {
         const pkce = getPkce()
         if (!pkce) {
-          throw new Error('登录状态已过期，请重新发起登录')
+          throw new Error('本次登录不是从前端登录按钮发起，或登录状态已过期，请重新登录')
         }
         if (pkce.state !== state) {
           throw new Error('登录状态校验失败，请重新登录')

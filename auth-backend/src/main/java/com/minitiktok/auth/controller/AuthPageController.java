@@ -4,6 +4,7 @@ import com.minitiktok.auth.dto.RegisterRequest;
 import com.minitiktok.auth.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
@@ -16,6 +17,14 @@ import org.springframework.web.bind.annotation.PostMapping;
 public class AuthPageController {
 
     private final UserService userService;
+
+    @Value("${app.frontend.base-url:http://localhost:5173}")
+    private String frontendBaseUrl;
+
+    @ModelAttribute("frontendBaseUrl")
+    public String frontendBaseUrl() {
+        return frontendBaseUrl;
+    }
 
     @GetMapping("/login")
     public String login() {

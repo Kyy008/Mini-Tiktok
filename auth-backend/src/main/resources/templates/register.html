@@ -91,7 +91,8 @@
         <p class="error" th:if="${registerError}" th:text="${registerError}"></p>
 
         <button type="submit">Create</button>
-        <a class="button" th:href="@{/login}">Back</a>
+        <a class="button" th:href="@{/login}">Login</a>
+        <a class="button" th:href="${frontendBaseUrl}">Back</a>
     </form>
 </main>
 </body>

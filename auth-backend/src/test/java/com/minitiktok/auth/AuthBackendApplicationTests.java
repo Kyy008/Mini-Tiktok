@@ -26,7 +26,9 @@ import org.springframework.security.oauth2.server.authorization.client.Registere
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
 import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -53,6 +55,7 @@ class AuthBackendApplicationTests {
     private static final String DEMO_PASSWORD_HASH =
             "$2y$10$NWdd7X01kXSvQMCYKgjfpujxSBVsnY/croLh3O8KsrG8Qb0YkWZWa";
     private static final String REDIRECT_URI = "http://localhost:5173/oauth/callback";
+    private static final String FRONTEND_BASE_URL = "http://localhost:5173";
 
     @Autowired
     private MockMvc mockMvc;
@@ -246,6 +249,44 @@ class AuthBackendApplicationTests {
     }
 
     @Test
+    void unauthenticatedAuthorizeRequestReturnsToAuthorizationAfterLogin() throws Exception {
+        jdbcTemplate.update("""
+                        insert into users (username, password_hash, enabled, created_at, updated_at)
+                        values (?, ?, true, current_timestamp, current_timestamp)
+                        """,
+                "demo",
+                DEMO_PASSWORD_HASH);
+        String codeVerifier = "review-test-code-verifier-with-enough-entropy-1234567890";
+        String codeChallenge = s256CodeChallenge(codeVerifier);
+
+        MvcResult authorizeResult = mockMvc.perform(get("/oauth2/authorize")
+                        .queryParam("response_type", "code")
+                        .queryParam("client_id", "tiktok-web")
+                        .queryParam("redirect_uri", REDIRECT_URI)
+                        .queryParam("scope", "video:read video:write")
+                        .queryParam("state", "review-state")
+                        .queryParam("code_challenge", codeChallenge)
+                        .queryParam("code_challenge_method", "S256")
+                        .accept(MediaType.TEXT_HTML))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(header().string("Location", containsString("/login")))
+                .andReturn();
+
+        MockHttpSession session = (MockHttpSession) authorizeResult.getRequest().getSession(false);
+        assertThat(session).isNotNull();
+
+        mockMvc.perform(post("/login")
+                        .session(session)
+                        .with(csrf())
+                        .param("username", "demo")
+                        .param("password", DEMO_PASSWORD))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(header().string("Location", containsString("/oauth2/authorize")))
+                .andExpect(header().string("Location", containsString("client_id=tiktok-web")))
+                .andExpect(header().string("Location", containsString("state=review-state")));
+    }
+
+    @Test
     void thirdPartyResourceReturnsProfileWithReadScope() throws Exception {
         mockMvc.perform(get("/third-party/resources/me")
                         .with(jwt().jwt(jwt -> jwt
@@ -338,7 +379,16 @@ class AuthBackendApplicationTests {
                         .param("username", "demo")
                         .param("password", DEMO_PASSWORD))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/"));
+                .andExpect(redirectedUrl(FRONTEND_BASE_URL));
+    }
+
+    @Test
+    void getLogoutClearsSessionCookieAndReturnsToFrontend() throws Exception {
+        mockMvc.perform(get("/logout")
+                        .with(user("demo")))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl(FRONTEND_BASE_URL))
+                .andExpect(header().string("Set-Cookie", containsString("JSESSIONID=;")));
     }
 
     private RegisteredClient tiktokWebClient() {

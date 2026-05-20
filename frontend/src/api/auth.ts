@@ -24,6 +24,10 @@ export function buildRegisterUrl(): string {
   return new URL('/register', AUTH_BASE_URL).toString()
 }
 
+export function buildLogoutUrl(): string {
+  return new URL('/logout', AUTH_BASE_URL).toString()
+}
+
 export async function exchangeCodeForToken(
   code: string,
   codeVerifier: string,

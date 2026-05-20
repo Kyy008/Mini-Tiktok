@@ -20,7 +20,7 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
 
-import { buildRegisterUrl } from '../api/auth'
+import { buildLogoutUrl, buildRegisterUrl } from '../api/auth'
 import { useAuthStore } from '../stores/auth'
 
 const authStore = useAuthStore()
@@ -33,6 +33,7 @@ function login(): void {
 
 function logout(): void {
   authStore.logout()
+  window.location.assign(buildLogoutUrl())
 }
 </script>
 
