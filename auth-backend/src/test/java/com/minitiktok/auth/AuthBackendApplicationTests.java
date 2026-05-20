@@ -34,9 +34,12 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
@@ -165,6 +168,49 @@ class AuthBackendApplicationTests {
         mockMvc.perform(get("/oauth2/jwks"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.keys").isArray());
+    }
+
+    @Test
+    void healthEndpointIsPublic() throws Exception {
+        mockMvc.perform(get("/health"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.status").value("ok"));
+    }
+
+    @Test
+    void wellKnownAuthorizationServerMetadataIsPublic() throws Exception {
+        mockMvc.perform(get("/.well-known/oauth-authorization-server"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.issuer").value("http://localhost:9000"))
+                .andExpect(jsonPath("$.authorization_endpoint").value("http://localhost:9000/oauth2/authorize"))
+                .andExpect(jsonPath("$.token_endpoint").value("http://localhost:9000/oauth2/token"))
+                .andExpect(jsonPath("$.jwks_uri").value("http://localhost:9000/oauth2/jwks"));
+    }
+
+    @Test
+    void loginPageRendersStatusMessagesAndCsrfField() throws Exception {
+        mockMvc.perform(get("/login")
+                        .queryParam("registered", "")
+                        .queryParam("logout", "")
+                        .queryParam("error", ""))
+                .andExpect(status().isOk())
+                .andExpect(view().name("login"))
+                .andExpect(content().string(containsString("Mini-Tiktok Login")))
+                .andExpect(content().string(containsString("Registration complete. Please sign in.")))
+                .andExpect(content().string(containsString("You have signed out.")))
+                .andExpect(content().string(containsString("Invalid username or password.")))
+                .andExpect(content().string(containsString("name=\"_csrf\"")));
+    }
+
+    @Test
+    void registerPageRendersEmptyFormWithCsrfField() throws Exception {
+        mockMvc.perform(get("/register"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("register"))
+                .andExpect(model().attributeExists("registerRequest"))
+                .andExpect(content().string(containsString("Create Account")))
+                .andExpect(content().string(containsString("name=\"_csrf\"")));
     }
 
     @Test
@@ -308,6 +354,60 @@ class AuthBackendApplicationTests {
     }
 
     @Test
+    void formRegisterRequiresCsrfToken() throws Exception {
+        mockMvc.perform(post("/register")
+                        .param("username", "csrfuser")
+                        .param("password", "Secret123"))
+                .andExpect(status().isForbidden());
+
+        Integer count = jdbcTemplate.queryForObject(
+                "select count(*) from users where username = ?",
+                Integer.class,
+                "csrfuser");
+        assertThat(count).isZero();
+    }
+
+    @Test
+    void formRegisterTrimsUsernameBeforePersisting() throws Exception {
+        mockMvc.perform(post("/register")
+                        .with(csrf())
+                        .param("username", "  trimuser  ")
+                        .param("password", "Secret123"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login?registered"));
+
+        Integer trimmedCount = jdbcTemplate.queryForObject(
+                "select count(*) from users where username = ?",
+                Integer.class,
+                "trimuser");
+        Integer rawCount = jdbcTemplate.queryForObject(
+                "select count(*) from users where username = ?",
+                Integer.class,
+                "  trimuser  ");
+        assertThat(trimmedCount).isEqualTo(1);
+        assertThat(rawCount).isZero();
+    }
+
+    @Test
+    void formRegisterAcceptsUsernameAndPasswordAtValidationBoundaries() throws Exception {
+        String username = "u".repeat(32);
+        String password = "p".repeat(64);
+
+        mockMvc.perform(post("/register")
+                        .with(csrf())
+                        .param("username", username)
+                        .param("password", password))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login?registered"));
+
+        String passwordHash = jdbcTemplate.queryForObject(
+                "select password_hash from users where username = ?",
+                String.class,
+                username);
+        assertThat(passwordEncoder.matches(password, passwordHash)).isTrue();
+    }
+
+    @Test
     void formRegisterRejectsDuplicateUsername() throws Exception {
         mockMvc.perform(post("/register")
                         .with(csrf())
@@ -336,6 +436,28 @@ class AuthBackendApplicationTests {
     }
 
     @Test
+    void formRegisterRejectsBlankPayload() throws Exception {
+        mockMvc.perform(post("/register")
+                        .with(csrf())
+                        .param("username", "   ")
+                        .param("password", ""))
+                .andExpect(status().isOk())
+                .andExpect(view().name("register"))
+                .andExpect(model().attributeHasFieldErrors("registerRequest", "username", "password"));
+    }
+
+    @Test
+    void formRegisterRejectsValuesAboveMaximumLength() throws Exception {
+        mockMvc.perform(post("/register")
+                        .with(csrf())
+                        .param("username", "u".repeat(33))
+                        .param("password", "p".repeat(65)))
+                .andExpect(status().isOk())
+                .andExpect(view().name("register"))
+                .andExpect(model().attributeHasFieldErrors("registerRequest", "username", "password"));
+    }
+
+    @Test
     void demoUserCanLoginWithBcryptPassword() throws Exception {
         jdbcTemplate.update("""
                         insert into users (username, password_hash, enabled, created_at, updated_at)
@@ -355,12 +477,160 @@ class AuthBackendApplicationTests {
     }
 
     @Test
+    void loginWithWrongPasswordRedirectsToLoginError() throws Exception {
+        insertUser("demo", DEMO_PASSWORD_HASH, true);
+
+        mockMvc.perform(post("/login")
+                        .with(csrf())
+                        .param("username", "demo")
+                        .param("password", "wrong-password"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login?error"));
+    }
+
+    @Test
+    void disabledUserCannotLogin() throws Exception {
+        insertUser("disabled", DEMO_PASSWORD_HASH, false);
+
+        mockMvc.perform(post("/login")
+                        .with(csrf())
+                        .param("username", "disabled")
+                        .param("password", DEMO_PASSWORD))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login?error"));
+    }
+
+    @Test
+    void loginRequiresCsrfToken() throws Exception {
+        insertUser("demo", DEMO_PASSWORD_HASH, true);
+
+        mockMvc.perform(post("/login")
+                        .param("username", "demo")
+                        .param("password", DEMO_PASSWORD))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void getLogoutClearsSessionCookieAndReturnsToFrontend() throws Exception {
         mockMvc.perform(get("/logout")
                         .with(user("demo")))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl(FRONTEND_BASE_URL))
                 .andExpect(header().string("Set-Cookie", containsString("JSESSIONID=;")));
+    }
+
+    @Test
+    void usersMeRequiresAuthentication() throws Exception {
+        mockMvc.perform(get("/users/me"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(header().string("Location", containsString("/login")));
+    }
+
+    @Test
+    void usersMeReturnsAuthUserPrincipalProfile() throws Exception {
+        mockMvc.perform(get("/users/me")
+                        .with(user(new AuthUserPrincipal(42L, "principaluser", DEMO_PASSWORD_HASH, true))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.id").value(42))
+                .andExpect(jsonPath("$.data.username").value("principaluser"));
+    }
+
+    @Test
+    void usersMeReturnsJwtProfile() throws Exception {
+        mockMvc.perform(get("/users/me")
+                        .with(jwt().jwt(jwt -> jwt
+                                .subject("7")
+                                .claim("preferred_username", "jwtuser"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(7))
+                .andExpect(jsonPath("$.data.username").value("jwtuser"));
+    }
+
+    @Test
+    void usersMeReturnsNullIdWhenJwtSubjectIsNotNumeric() throws Exception {
+        mockMvc.perform(get("/users/me")
+                        .with(jwt().jwt(jwt -> jwt
+                                .subject("not-a-number")
+                                .claim("preferred_username", "jwtuser"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").doesNotExist())
+                .andExpect(jsonPath("$.data.username").value("jwtuser"));
+    }
+
+    @Test
+    void usersMeFallsBackToAuthenticationNameForStandardUser() throws Exception {
+        mockMvc.perform(get("/users/me")
+                        .with(user("plainuser")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").doesNotExist())
+                .andExpect(jsonPath("$.data.username").value("plainuser"));
+    }
+
+    @Test
+    void corsPreflightAllowsFrontendForTokenEndpoint() throws Exception {
+        mockMvc.perform(options("/oauth2/token")
+                        .header("Origin", FRONTEND_BASE_URL)
+                        .header("Access-Control-Request-Method", "POST")
+                        .header("Access-Control-Request-Headers", "content-type"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", FRONTEND_BASE_URL))
+                .andExpect(header().string("Access-Control-Allow-Credentials", "true"));
+    }
+
+    @Test
+    void corsPreflightRejectsUnknownOrigin() throws Exception {
+        mockMvc.perform(options("/oauth2/token")
+                        .header("Origin", "http://evil.example")
+                        .header("Access-Control-Request-Method", "POST"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void tokenEndpointRejectsInvalidAuthorizationCode() throws Exception {
+        mockMvc.perform(post("/oauth2/token")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("grant_type", "authorization_code")
+                        .param("client_id", "tiktok-web")
+                        .param("redirect_uri", REDIRECT_URI)
+                        .param("code", "invalid-code")
+                        .param("code_verifier", "review-test-code-verifier-with-enough-entropy-1234567890"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("invalid_grant"));
+    }
+
+    @Test
+    void tokenEndpointRejectsWrongPkceVerifier() throws Exception {
+        String codeVerifier = "review-test-code-verifier-with-enough-entropy-1234567890";
+        String codeChallenge = s256CodeChallenge(codeVerifier);
+
+        String location = mockMvc.perform(get("/oauth2/authorize")
+                        .queryParam("response_type", "code")
+                        .queryParam("client_id", "tiktok-web")
+                        .queryParam("redirect_uri", REDIRECT_URI)
+                        .queryParam("scope", "video:read")
+                        .queryParam("state", "pkce-state")
+                        .queryParam("code_challenge", codeChallenge)
+                        .queryParam("code_challenge_method", "S256")
+                        .with(user(new AuthUserPrincipal(1L, "demo", DEMO_PASSWORD_HASH, true))))
+                .andExpect(status().is3xxRedirection())
+                .andReturn()
+                .getResponse()
+                .getHeader("Location");
+        String code = UriComponentsBuilder.fromUriString(location)
+                .build()
+                .getQueryParams()
+                .getFirst("code");
+
+        mockMvc.perform(post("/oauth2/token")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("grant_type", "authorization_code")
+                        .param("client_id", "tiktok-web")
+                        .param("redirect_uri", REDIRECT_URI)
+                        .param("code", code)
+                        .param("code_verifier", "wrong-verifier-with-enough-entropy-1234567890"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("invalid_grant"));
     }
 
     private RegisteredClient tiktokWebClient() {
@@ -390,5 +660,15 @@ class AuthBackendApplicationTests {
         return Base64.getUrlEncoder()
                 .withoutPadding()
                 .encodeToString(digest);
+    }
+
+    private void insertUser(String username, String passwordHash, boolean enabled) {
+        jdbcTemplate.update("""
+                        insert into users (username, password_hash, enabled, created_at, updated_at)
+                        values (?, ?, ?, current_timestamp, current_timestamp)
+                        """,
+                username,
+                passwordHash,
+                enabled);
     }
 }
