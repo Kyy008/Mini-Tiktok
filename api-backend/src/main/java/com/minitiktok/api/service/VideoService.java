@@ -1,5 +1,6 @@
 package com.minitiktok.api.service;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 import org.springframework.stereotype.Service;
@@ -39,6 +40,17 @@ public class VideoService {
             throw new IllegalStateException("Failed to insert video record");
         }
         return video;
+    }
+
+    public Video createUploadedVideo(String title, String fileHash, String uploaderId, LocalDateTime createdAt) {
+        Video video = Video.builder()
+                .title(title)
+                .fileHash(fileHash)
+                .uploaderId(uploaderId)
+                .deleted(false)
+                .createdAt(createdAt)
+                .build();
+        return save(video);
     }
 
     public boolean softDeleteById(Long id) {
