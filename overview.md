@@ -35,6 +35,7 @@ api-backend:  http://localhost:8085
 - 前端通过 OAuth2 Authorization Code + PKCE 登录。
 - `auth-backend` 签发 JWT Access Token。
 - `api-backend` 通过 `issuer-uri=http://localhost:9000` 校验 token。
+- 登录和注册由 `frontend` 直接对接 `auth-backend`，`api-backend` 不参与登录注册中转。
 - 视频格式统一为 `MP4`
 
 ## 2. 总体分工表
@@ -51,7 +52,7 @@ api-backend:  http://localhost:8085
 
 ### 3.1 负责范围
 
-组员 A 负责 `auth-backend`，实现独立 OAuth2 鉴权服务器。
+组员 A 负责 `auth-backend`，实现本地模拟 OAuth2 鉴权服务器。
 
 参考文档：
 
@@ -81,6 +82,7 @@ auth-backend/auth-backend-plan.md
 登录注册页面：
 
 - 实现 `GET /login`。
+- `POST /login` 由 Spring Security `formLogin()` filter 处理，调用 `DatabaseUserDetailsService` 从 `users` 表查找用户并用 BCrypt 校验密码。
 - 实现 `GET /register`。
 - 实现 `POST /register`。
 - 配置 Spring Security 表单登录。
@@ -126,6 +128,8 @@ JWT claims：
 
 与组员 D 联调：
 
+- 前端注册入口能跳转到 `auth-backend` 的 `GET /register` 页面，并由该页面提交 `POST /register` 完成注册。
+- 前端能生成 `code_verifier`、`code_challenge` 和 `state`。
 - 前端点击登录能跳转 `/oauth2/authorize`。
 - 登录成功后能回调 `http://localhost:5173/oauth/callback?code=...`。
 - 前端能用 code + code_verifier 换取 access token。
@@ -150,10 +154,16 @@ JWT claims：
 
 - 应用能在 `http://localhost:9000` 启动。
 - 空数据库启动后 Flyway 自动建表。
+- 数据库连接探测、`users` 用户查找、`tiktok-web` OAuth2 client 查找可用。
 - 用户可以注册和登录。
+- `GET /register` 返回注册 HTML，`POST /register` 能创建用户。
+- `POST /login` 能通过 Spring Security 表单登录处理，并从数据库读取用户完成密码校验。
+- `demo / Demo@123456` 可以完成表单登录验证。
+- 前端生成的 PKCE 参数能通过授权服务器校验。
 - 密码入库为 BCrypt hash。
 - `/oauth2/jwks` 能返回公钥。
 - 前端能拿到 access token。
+- 真实签发的 JWT access token 包含 `iss`、`sub`、`preferred_username`、`scope`。
 - `api-backend` 能校验 access token。
 
 ## 4. 组员 B：业务后端视频基础
@@ -495,6 +505,7 @@ OAuth2 前端流程：
 - 用 authorization code 换 access token。
 - 保存 access token。
 - 调用 `/api/me` 获取当前用户。
+- 注册入口跳转到 `auth-backend` 的 `/register` 页面。
 
 路由页面：
 
@@ -549,6 +560,7 @@ Authorization: Bearer <access_token>
 与组员 A 联调：
 
 - 点击登录能跳转授权服务器。
+- 点击注册能跳转到 `auth-backend` 的注册页面。
 - 授权成功后能回到 `/oauth/callback`。
 - 前端能换取 access token。
 
@@ -571,6 +583,7 @@ Authorization: Bearer <access_token>
 
 - 可运行的 Vue 前端项目。
 - OAuth2 登录入口。
+- 注册跳转入口。
 - OAuth2 回调页。
 - 推荐视频页。
 - 发布视频页。
@@ -581,6 +594,7 @@ Authorization: Bearer <access_token>
 ### 6.5 验收标准
 
 - 应用能在 `http://localhost:5173` 启动。
+- 能跳转到 `auth-backend` 的注册页完成注册。
 - 能完成 OAuth2 PKCE 登录流程。
 - 登录后能显示当前用户。
 - 能展示推荐视频并播放。
@@ -727,4 +741,3 @@ B：配合处理视频删除后推荐和播放逻辑。
 组员 D：负责 Vue 前端、OAuth2 前端流程、推荐页、上传页和我的视频页。
 组长：负责系统架构设计、任务拆分、接口协调、联调验收和答辩材料整合。
 ```
-

@@ -16,7 +16,7 @@
 - 支持分页查看我的视频。
 - 支持删除自己发布的视频。
 
-登录和注册页面由 `auth-backend` 托管。前端提供登录入口，负责跳转授权服务器、处理 OAuth2 回调和维护登录状态。
+登录和注册页面由 `auth-backend` 托管。前端提供登录入口，负责生成 PKCE 参数、跳转授权服务器、处理 OAuth2 回调和维护登录状态；注册入口直接跳转到 `auth-backend` 的 `/register` 页面。
 
 本地端口约定：
 
@@ -525,7 +525,7 @@ getVideoLikeStatus(id)
 验收：
 
 - 应用能在 `http://localhost:5173` 启动。
-- 四个路由页面能正常打开。
+- 五个路由页面能正常打开。
 
 ### 阶段 2：OAuth2 PKCE 工具
 
@@ -551,15 +551,17 @@ getVideoLikeStatus(id)
 任务：
 
 1. 实现 `authStore.login()`。
-2. 实现 `/oauth/callback` 页面。
-3. 实现 token 换取请求。
-4. 保存 access token。
-5. 调用 `/api/me` 获取当前用户。
-6. 处理回调失败状态。
+2. 实现注册入口跳转到 `auth-backend /register`。
+3. 实现 `/oauth/callback` 页面。
+4. 实现 token 换取请求。
+5. 保存 access token。
+6. 调用 `/api/me` 获取当前用户。
+7. 处理回调失败状态。
 
 验收：
 
 - 点击登录能跳转授权服务器。
+- 点击注册能跳转到 `auth-backend` 注册页面。
 - 授权成功后能回到前端。
 - 前端能保存 access token。
 - 前端能显示当前用户名。
