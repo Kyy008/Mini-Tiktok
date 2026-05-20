@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Mini-Tiktok Register</title>
+    <style>
+        body {
+            min-height: 100vh;
+            margin: 0;
+            display: grid;
+            place-items: center;
+            font-family: Arial, sans-serif;
+            background: #f5f7fb;
+            color: #1f2937;
+        }
+
+        main {
+            width: min(420px, calc(100vw - 32px));
+            padding: 32px;
+            border: 1px solid #dde3ee;
+            border-radius: 8px;
+            background: #ffffff;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            margin: 0 0 24px;
+            font-size: 24px;
+        }
+
+        label {
+            display: block;
+            margin: 14px 0 6px;
+            font-weight: 700;
+        }
+
+        input {
+            width: 100%;
+            height: 42px;
+            padding: 0 12px;
+            border: 1px solid #cfd7e6;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 15px;
+        }
+
+        button, a.button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            height: 42px;
+            margin-top: 20px;
+            padding: 0 16px;
+            border: 0;
+            border-radius: 6px;
+            background: #111827;
+            color: #ffffff;
+            text-decoration: none;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        a.button {
+            margin-left: 8px;
+            background: #e5e7eb;
+            color: #111827;
+        }
+
+        .error {
+            margin: 8px 0 0;
+            color: #991b1b;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+<main>
+    <h1>Create Account</h1>
+
+    <form th:action="@{/register}" th:object="${registerRequest}" method="post">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+
+        <label for="username">Username</label>
+        <input id="username" th:field="*{username}" type="text" autocomplete="username" required autofocus>
+        <p class="error" th:if="${#fields.hasErrors('username')}" th:errors="*{username}"></p>
+
+        <label for="password">Password</label>
+        <input id="password" th:field="*{password}" type="password" autocomplete="new-password" required>
+        <p class="error" th:if="${#fields.hasErrors('password')}" th:errors="*{password}"></p>
+        <p class="error" th:if="${registerError}" th:text="${registerError}"></p>
+
+        <button type="submit">Create</button>
+        <a class="button" th:href="@{/login}">Login</a>
+        <a class="button" th:href="${frontendBaseUrl}">Back</a>
+    </form>
+</main>
+</body>
+</html>

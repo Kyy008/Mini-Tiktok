@@ -1,5 +1,7 @@
 // 前后端数据类型。
 
+// ===== 业务数据 =====
+
 export interface UserInfo {
   id: number
   username: string
@@ -40,4 +42,26 @@ export interface PageResult<T> {
   size: number
   total: number
   hasMore: boolean
+}
+
+// ===== 鉴权 / OAuth2 =====
+
+export interface ApiResult<T> {
+  code: number
+  message: string
+  data?: T | null
+}
+
+/** /api/me 返回的登录用户。auth-backend 透传的字段，仅含基础身份信息。 */
+export interface CurrentUser {
+  userId: string
+  username: string | null
+  scopes: string[]
+}
+
+export interface OAuthTokenResponse {
+  access_token: string
+  token_type: string
+  expires_in?: number
+  scope?: string
 }

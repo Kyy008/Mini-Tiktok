@@ -3,16 +3,17 @@
     <div class="scroll">
       <header class="cover">
         <div class="cover-actions">
-          <button class="ghost" @click="onLogout">退出登录</button>
+          <button v-if="isAuthenticated" class="ghost" @click="onLogout">退出登录</button>
+          <button v-else class="ghost primary" @click="onLogin">登录 / 注册</button>
         </div>
         <div class="user">
-          <img class="avatar" :src="user?.avatar" alt="" />
+          <img class="avatar" :src="displayUser.avatar" alt="" />
           <div class="meta">
-            <div class="name">{{ user?.username }}</div>
-            <div class="uid">抖音号：mini_{{ user?.id }}</div>
+            <div class="name">{{ displayUser.username }}</div>
+            <div class="uid">抖音号：mini_{{ displayUser.id }}</div>
           </div>
         </div>
-        <div class="sign">{{ user?.signature }}</div>
+        <div class="sign">{{ displayUser.signature }}</div>
         <div class="stats">
           <div><b>56</b><span>关注</span></div>
           <div><b>1.2w</b><span>粉丝</span></div>
@@ -67,13 +68,12 @@ import { storeToRefs } from 'pinia'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { VideoItem } from '../api/types'
 import { useVideoStore } from '../stores/video'
-import { useAuthStore } from '../stores/auth'
+import { useDisplayUser } from '../composables/useDisplayUser'
 
 const router = useRouter()
 const videoStore = useVideoStore()
-const authStore = useAuthStore()
+const { displayUser, isAuthenticated, authStore } = useDisplayUser()
 const { myVideos } = storeToRefs(videoStore)
-const { user } = storeToRefs(authStore)
 
 const current = ref<VideoItem | null>(null)
 
@@ -99,8 +99,13 @@ async function remove() {
 
 function onLogout() {
   authStore.logout()
-  ElMessage('已退出登录（Mock）')
+  ElMessage('已退出登录')
   router.push('/')
+}
+
+function onLogin() {
+  // 跳到 auth-backend 走 OAuth2 PKCE
+  void authStore.login()
 }
 </script>
 
@@ -132,6 +137,12 @@ function onLogout() {
   border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 14px;
   padding: 5px 12px;
+}
+
+.ghost.primary {
+  color: #fff;
+  background: #fe2c55;
+  border-color: #fe2c55;
 }
 
 .user {

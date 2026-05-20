@@ -37,13 +37,13 @@
 import { ref, watch } from 'vue'
 import type { CommentItem } from '../api/types'
 import { useVideoStore } from '../stores/video'
-import { useAuthStore } from '../stores/auth'
+import { useDisplayUser } from '../composables/useDisplayUser'
 
 const props = defineProps<{ visible: boolean; videoId: number | null }>()
 defineEmits<{ close: [] }>()
 
 const videoStore = useVideoStore()
-const authStore = useAuthStore()
+const { displayUser } = useDisplayUser()
 const comments = ref<CommentItem[]>([])
 const draft = ref('')
 
@@ -58,10 +58,10 @@ watch(
 
 function send() {
   const text = draft.value.trim()
-  if (!text || !authStore.user) return
+  if (!text) return
   comments.value.unshift({
     id: Date.now(),
-    user: authStore.user,
+    user: displayUser.value,
     content: text,
     likeCount: 0,
     createdAt: '刚刚',

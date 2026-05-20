@@ -19,7 +19,7 @@
 
 ### 2.1 基础技术
 
-- Java 17 或 Java 21
+- Java 17
 - Spring Boot 3.x
 - Spring Web
 - Spring Security 6
@@ -58,7 +58,7 @@ spring:
 
 - `auth-backend` 使用私钥签发 JWT。
 - `api-backend` 通过 `issuer-uri` 发现授权服务器元数据和 JWK 公钥。
-- `api-backend` 只验证 token，不保存用户密码，不实现登录注册。
+- `api-backend` 只验证 token，不保存用户密码，不生成登录 URL，也不代理注册。
 - 当前用户 ID 从 JWT `sub` 读取。
 - 开发环境使用 `http://localhost:8085` 提供业务接口。
 

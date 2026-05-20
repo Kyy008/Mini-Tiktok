@@ -17,7 +17,7 @@
 
 ### 2.1 基础技术
 
-- Java 17 或 Java 21
+- Java 17
 - Spring Boot 3.5.x
 - Spring Security 6
 - Spring Authorization Server 1.5.x
@@ -191,7 +191,7 @@ GET  /users/me
 接口说明：
 
 - `GET /login`：展示登录页。
-- `POST /login`：由 Spring Security 表单登录处理。
+- `POST /login`：由 Spring Security `formLogin()` 的 `UsernamePasswordAuthenticationFilter` 处理，不在 Controller 中手写；它调用 `DatabaseUserDetailsService` 从 `users` 表按用户名查找用户，并用 `BCryptPasswordEncoder` 校验密码。
 - `GET /register`：展示注册页。
 - `POST /register`：创建用户，密码使用 BCrypt 加密。
 - `POST /logout`：注销当前 auth server session。
@@ -281,6 +281,7 @@ security
 - 应用启动成功。
 - 能连接 MySQL。
 - Flyway 启动时能自动执行数据库迁移。
+- 测试环境通过 `JdbcTemplate` 执行连接探测，并验证 `UserService.findByUsername`、`JdbcRegisteredClientRepository.findByClientId` 查询可用。
 
 ### 阶段 2：用户模块
 
@@ -302,6 +303,7 @@ security
 - 密码入库为 BCrypt hash。
 - 用户名重复会报错。
 - 禁用用户不能登录。
+- `DatabaseUserDetailsService` 能从 `users` 表查到用户并交给 `POST /login` 表单登录流程验证。
 
 ### 阶段 3：登录与注册页面
 
@@ -446,10 +448,15 @@ spring:
 
 - 空数据库启动后 Flyway 自动创建用户表和 OAuth2 表。
 - 重复启动应用不会重复执行已完成迁移。
+- 数据库连接探测成功。
+- `UserService.findByUsername` 能从 `users` 表查到用户。
+- `JdbcRegisteredClientRepository.findByClientId("tiktok-web")` 能查到 OAuth2 client。
 - 注册成功。
+- `POST /register` 表单注册成功后密码入库为 BCrypt hash，不保存明文。
 - 用户名重复注册失败。
 - 密码过短注册失败。
-- 登录成功。
+- `demo / Demo@123456` 可以通过表单登录验证。
+- `POST /login` 经 Spring Security 表单登录处理后登录成功。
 - 密码错误登录失败。
 - 禁用用户登录失败。
 - 注销后访问需登录页面会重新跳转登录。
@@ -458,11 +465,12 @@ spring:
 
 - 未登录访问 `/oauth2/authorize` 会跳转 `/login`。
 - 登录后能获得 authorization code。
-- 正确 PKCE 能换 access token。
+- 正确 PKCE 能通过真实 `/oauth2/authorize` + `/oauth2/token` 链路换 access token。
 - 错误 PKCE 不能换 token。
 - 错误 redirect uri 不能授权。
 - 错误 client id 不能授权。
 - authorization code 只能使用一次。
+- JDBC `RegisteredClientRepository` 中的 `tiktok-web` client 支持 `authorization_code`、`ClientAuthenticationMethod.NONE` 和 `requireProofKey(true)`。
 
 ### 10.3 Token 测试
 
@@ -472,6 +480,7 @@ spring:
 - JWT 过期时间正确。
 - JWT 包含 scope。
 - JWT 包含用户 ID 和用户名。
+- 解码真实签发的 access token 后，能看到 `sub`、`preferred_username`、`scope`。
 
 ### 10.4 与 api-backend 联调测试
 
@@ -522,6 +531,16 @@ spring:
 - 资源归属由 `api-backend` 根据 JWT `sub` 和业务表 `uploader_id` 校验。
 - 删除视频、我的视频列表、已访问记录、点赞记录都以当前用户 `sub` 为准。
 
+### 11.5 JDBC 授权记录反序列化
+
+风险：Spring Authorization Server 的 `JdbcOAuth2AuthorizationService` 会把登录 principal 存入 `oauth2_authorization.attributes`。如果使用自定义 `AuthUserPrincipal`，换 token 时反序列化不在 Spring Security Jackson allowlist 内会失败。
+
+处理：
+
+- `AuthUserPrincipal` 显式添加 Jackson 类型信息和创建器。
+- 忽略 `authorities`、账号未过期等可计算字段，只持久化 `id`、`username`、`password`、`enabled`。
+- 使用真实 Authorization Code + PKCE 测试覆盖 `/oauth2/authorize`、JDBC authorization 保存、`/oauth2/token` 换 JWT。
+
 ## 12. 完成标准
 
 `auth-backend` 完成后应该达到：
@@ -532,6 +551,4 @@ spring:
 - 能暴露 JWK 公钥集合。
 - JWT 中包含用户 ID、用户名、scope。
 - `api-backend` 能通过 `issuer-uri` 验证 token。
-- 密码不明文存储。
-- 数据库结构和初始化数据由 Flyway 迁移文件维护。
 - client 配置、OAuth2 流程、token 示例都有文档可用于答辩。

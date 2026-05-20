@@ -14,8 +14,16 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import TabBar from './components/TabBar.vue'
+import { useAuthStore } from './stores/auth'
 
 const route = useRoute()
+const authStore = useAuthStore()
+
+// 应用启动时尝试用 sessionStorage 中的 token 恢复登录态
+onMounted(() => {
+  void authStore.restore()
+})
 </script>
