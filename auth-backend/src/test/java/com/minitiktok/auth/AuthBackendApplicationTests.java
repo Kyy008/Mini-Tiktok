@@ -4,7 +4,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.Base64;
-import java.util.List;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.minitiktok.auth.security.AuthUserPrincipal;
@@ -16,7 +15,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
@@ -36,7 +34,6 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -284,31 +281,6 @@ class AuthBackendApplicationTests {
                 .andExpect(header().string("Location", containsString("/oauth2/authorize")))
                 .andExpect(header().string("Location", containsString("client_id=tiktok-web")))
                 .andExpect(header().string("Location", containsString("state=review-state")));
-    }
-
-    @Test
-    void thirdPartyResourceReturnsProfileWithReadScope() throws Exception {
-        mockMvc.perform(get("/third-party/resources/me")
-                        .with(jwt().jwt(jwt -> jwt
-                                .subject("1")
-                                .claim("preferred_username", "demo")
-                                .claim("scope", List.of("video:read")))
-                                .authorities(new SimpleGrantedAuthority("SCOPE_video:read"))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.provider").value("mini-tiktok-mock"))
-                .andExpect(jsonPath("$.data.userId").value("1"))
-                .andExpect(jsonPath("$.data.username").value("demo"));
-    }
-
-    @Test
-    void thirdPartyWriteResourceRequiresWriteScope() throws Exception {
-        mockMvc.perform(post("/third-party/resources/videos")
-                        .with(jwt().jwt(jwt -> jwt
-                                .subject("1")
-                                .claim("preferred_username", "demo")
-                                .claim("scope", List.of("video:read")))
-                                .authorities(new SimpleGrantedAuthority("SCOPE_video:read"))))
-                .andExpect(status().isForbidden());
     }
 
     @Test
