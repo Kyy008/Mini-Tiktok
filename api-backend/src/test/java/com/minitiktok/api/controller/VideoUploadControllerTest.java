@@ -1,7 +1,10 @@
 package com.minitiktok.api.controller;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -71,6 +74,51 @@ class VideoUploadControllerTest {
     }
 
     @Test
+    void shouldReturnBadRequestWhenInitUploadRequestIsInvalid() throws Exception {
+        mockMvc.perform(post("/api/video-uploads/init")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": " ",
+                                  "fileName": "demo.mp4",
+                                  "fileSize": 0,
+                                  "contentType": "video/mp4",
+                                  "chunkSize": 5,
+                                  "totalChunks": 3,
+                                  "fileHash": "hash123"
+                                }
+                                """)
+                        .with(jwt().authorities(() -> "SCOPE_video:write")
+                                .jwt(jwt -> jwt.subject("1")
+                                        .claim("preferred_username", "demo")
+                                        .claim("scope", "video:write"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value(containsString("title")))
+                .andExpect(jsonPath("$.message").value(containsString("fileSize")));
+
+        verify(videoUploadSessionService, never()).initUpload(any(), any());
+    }
+
+    @Test
+    void shouldReturnUnauthorizedWhenInitUploadWithoutAuthentication() throws Exception {
+        mockMvc.perform(post("/api/video-uploads/init")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Demo Video",
+                                  "fileName": "demo.mp4",
+                                  "fileSize": 12,
+                                  "contentType": "video/mp4",
+                                  "chunkSize": 5,
+                                  "totalChunks": 3,
+                                  "fileHash": "hash123"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void shouldReturnUploadStatusWhenUserHasVideoWriteScope() throws Exception {
         when(videoUploadSessionService.getUploadStatus("upload123", "1"))
                 .thenReturn(new VideoUploadSessionResponse("upload123", 2, 10L, 12L, 5, 3, "UPLOADING"));
@@ -83,6 +131,16 @@ class VideoUploadControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.nextChunkIndex").value(2))
                 .andExpect(jsonPath("$.data.uploadedBytes").value(10));
+    }
+
+    @Test
+    void shouldReturnForbiddenWhenReadingUploadStatusWithoutVideoWriteScope() throws Exception {
+        mockMvc.perform(get("/api/video-uploads/upload123")
+                        .with(jwt().authorities(() -> "SCOPE_video:read")
+                                .jwt(jwt -> jwt.subject("1")
+                                        .claim("preferred_username", "demo")
+                                        .claim("scope", "video:read"))))
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -102,6 +160,14 @@ class VideoUploadControllerTest {
                 .andExpect(jsonPath("$.data.nextChunkIndex").value(1))
                 .andExpect(jsonPath("$.data.uploadedBytes").value(5))
                 .andExpect(jsonPath("$.data.completed").value(false));
+    }
+
+    @Test
+    void shouldReturnUnauthorizedWhenUploadingChunkWithoutAuthentication() throws Exception {
+        mockMvc.perform(put("/api/video-uploads/upload123/chunks/0")
+                        .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                        .content("12345".getBytes()))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -173,6 +239,36 @@ class VideoUploadControllerTest {
                 .andExpect(jsonPath("$.data.id").value(1))
                 .andExpect(jsonPath("$.data.title").value("Demo Video"))
                 .andExpect(jsonPath("$.data.playUrl").value("/api/videos/1/play"));
+    }
+
+    @Test
+    void shouldReturnConflictWhenCompletingUploadBeforeAllChunksArrive() throws Exception {
+        when(videoUploadSessionService.completeUpload("upload123", "1"))
+                .thenThrow(new ResponseStatusException(HttpStatus.CONFLICT, "upload is not complete yet"));
+
+        mockMvc.perform(post("/api/video-uploads/upload123/complete")
+                        .with(jwt().authorities(() -> "SCOPE_video:write")
+                                .jwt(jwt -> jwt.subject("1")
+                                        .claim("preferred_username", "demo")
+                                        .claim("scope", "video:write"))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value(409))
+                .andExpect(jsonPath("$.message").value("upload is not complete yet"));
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenCompletingMissingUploadSession() throws Exception {
+        when(videoUploadSessionService.completeUpload("missing-upload", "1"))
+                .thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "upload session not found"));
+
+        mockMvc.perform(post("/api/video-uploads/missing-upload/complete")
+                        .with(jwt().authorities(() -> "SCOPE_video:write")
+                                .jwt(jwt -> jwt.subject("1")
+                                        .claim("preferred_username", "demo")
+                                        .claim("scope", "video:write"))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(404))
+                .andExpect(jsonPath("$.message").value("upload session not found"));
     }
 
     @Test

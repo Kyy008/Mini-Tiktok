@@ -137,6 +137,21 @@ class VideoControllerTest {
     }
 
     @Test
+    void shouldReturnNotFoundWhenPlayingMissingVideoRecord() throws Exception {
+        when(videoService.findActiveById(404L)).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/api/videos/404/play")
+                        .with(jwt().authorities(() -> "SCOPE_video:read")
+                                .jwt(jwt -> jwt
+                                        .subject("1")
+                                        .claim("preferred_username", "demo")
+                                        .claim("scope", "video:read"))))
+                .andExpect(status().isNotFound());
+
+        verify(videoStorageService, never()).loadAsResource(any());
+    }
+
+    @Test
     void shouldReturnForbiddenForReadEndpointsWithoutVideoReadScope() throws Exception {
         mockMvc.perform(get("/api/videos/1")
                         .with(jwt().authorities(() -> "SCOPE_video:write")
@@ -195,6 +210,21 @@ class VideoControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400))
                 .andExpect(jsonPath("$.message").value("Page number must be greater than or equal to 1"));
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenMyVideosSizeParameterIsInvalid() throws Exception {
+        mockMvc.perform(get("/api/my/videos")
+                        .param("page", "1")
+                        .param("size", "0")
+                        .with(jwt().authorities(() -> "SCOPE_video:read")
+                                .jwt(jwt -> jwt
+                                        .subject("1")
+                                        .claim("preferred_username", "demo")
+                                        .claim("scope", "video:read"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value("Page size must be greater than or equal to 1"));
     }
 
     @Test
@@ -370,6 +400,55 @@ class VideoControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400))
                 .andExpect(jsonPath("$.message").value("Video title must not be blank"));
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenUploadTitleIsTooLong() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "demo.mp4",
+                "video/mp4",
+                "video-content".getBytes());
+
+        mockMvc.perform(multipart("/api/videos")
+                        .file(file)
+                        .param("title", "a".repeat(129))
+                        .with(jwt().authorities(() -> "SCOPE_video:write")
+                                .jwt(jwt -> jwt
+                                        .subject("1")
+                                        .claim("preferred_username", "demo")
+                                        .claim("scope", "video:write"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value("Video title must not exceed 128 characters"));
+
+        verify(videoStorageService, never()).store(any());
+        verify(videoService, never()).createUploadedVideo(any(), any(), any(), any());
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenStorageRejectsUploadedFile() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "demo.txt",
+                "text/plain",
+                "not-a-video".getBytes());
+        when(videoStorageService.store(any()))
+                .thenThrow(new IllegalArgumentException("Only MP4 video files are supported"));
+
+        mockMvc.perform(multipart("/api/videos")
+                        .file(file)
+                        .param("title", "Demo Video")
+                        .with(jwt().authorities(() -> "SCOPE_video:write")
+                                .jwt(jwt -> jwt
+                                        .subject("1")
+                                        .claim("preferred_username", "demo")
+                                        .claim("scope", "video:write"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value("Only MP4 video files are supported"));
+
+        verify(videoService, never()).createUploadedVideo(any(), any(), any(), any());
     }
 
     @Test

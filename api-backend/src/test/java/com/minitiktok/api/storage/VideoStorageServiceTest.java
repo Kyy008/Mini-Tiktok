@@ -1,6 +1,7 @@
 package com.minitiktok.api.storage;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -53,6 +54,21 @@ class VideoStorageServiceTest {
     }
 
     @Test
+    void shouldStoreFileWhenMp4ExtensionIsPresentEvenIfContentTypeIsGeneric() {
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "demo.MP4",
+                "application/octet-stream",
+                "fake-mp4-content".getBytes());
+
+        StoredVideoFile storedVideoFile = videoStorageService.store(file);
+
+        assertEquals(file.getSize(), storedVideoFile.size());
+        assertEquals("application/octet-stream", storedVideoFile.contentType());
+        assertTrue(Files.exists(storedVideoFile.absolutePath()));
+    }
+
+    @Test
     void shouldRejectEmptyFile() {
         MockMultipartFile file = new MockMultipartFile(
                 "file",
@@ -91,6 +107,27 @@ class VideoStorageServiceTest {
     }
 
     @Test
+    void shouldLoadStoredVideoResourceWhenFileExists() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "demo.mp4",
+                "video/mp4",
+                "resource-content".getBytes());
+        StoredVideoFile storedVideoFile = videoStorageService.store(file);
+
+        var resource = videoStorageService.loadAsResource(storedVideoFile.fileHash());
+
+        assertTrue(resource.isPresent());
+        assertTrue(resource.get().exists());
+        assertEquals(storedVideoFile.absolutePath(), resource.get().getFile().toPath());
+    }
+
+    @Test
+    void shouldReturnEmptyResourceWhenStoredVideoDoesNotExist() {
+        assertTrue(videoStorageService.loadAsResource("missing-hash").isEmpty());
+    }
+
+    @Test
     void shouldAppendChunksAndFinalizeResumableUpload() throws Exception {
         byte[] firstChunk = "first-".getBytes();
         byte[] secondChunk = "second".getBytes();
@@ -115,6 +152,40 @@ class VideoStorageServiceTest {
     }
 
     @Test
+    void shouldReturnZeroWhenTempUploadFileDoesNotExist() {
+        assertEquals(0L, videoStorageService.getTempUploadSize("missing-upload"));
+    }
+
+    @Test
+    void shouldRejectFinalizeWhenTempUploadFileDoesNotExist() {
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                () -> videoStorageService.storeResumableUpload(
+                        "missing-upload",
+                        "hash123",
+                        "demo.mp4",
+                        "video/mp4",
+                        12L));
+
+        assertEquals("Temporary upload file does not exist", exception.getMessage());
+    }
+
+    @Test
+    void shouldRejectFinalizeWhenUploadedFileSizeDoesNotMatchExpectedSize() {
+        byte[] content = "chunk-content".getBytes();
+        videoStorageService.appendChunk("upload-size-mismatch", content);
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                () -> videoStorageService.storeResumableUpload(
+                        "upload-size-mismatch",
+                        sha256(content),
+                        "demo.mp4",
+                        "video/mp4",
+                        content.length + 1L));
+
+        assertEquals("Uploaded file size does not match the expected size", exception.getMessage());
+    }
+
+    @Test
     void shouldRejectFinalizeWhenHashDoesNotMatch() {
         byte[] content = "chunk-content".getBytes();
 
@@ -126,6 +197,39 @@ class VideoStorageServiceTest {
                 "demo.mp4",
                 "video/mp4",
                 content.length));
+    }
+
+    @Test
+    void shouldDeduplicateFinalizedResumableUploadAgainstExistingStoredFile() throws Exception {
+        byte[] content = "same-resumable-content".getBytes();
+        String expectedHash = sha256(content);
+        MockMultipartFile existingFile = new MockMultipartFile("file", "existing.mp4", "video/mp4", content);
+        StoredVideoFile existingStoredFile = videoStorageService.store(existingFile);
+        videoStorageService.appendChunk("upload-dedup", content);
+
+        StoredVideoFile finalizedFile = videoStorageService.storeResumableUpload(
+                "upload-dedup",
+                expectedHash,
+                "dedup.mp4",
+                "video/mp4",
+                content.length);
+
+        assertEquals(existingStoredFile.fileHash(), finalizedFile.fileHash());
+        assertEquals(existingStoredFile.absolutePath(), finalizedFile.absolutePath());
+        assertFalse(Files.exists(tempUploadDir.resolve("upload-dedup.part")));
+        try (var files = Files.list(storageDir)) {
+            assertEquals(1L, files.filter(Files::isRegularFile).count());
+        }
+    }
+
+    @Test
+    void shouldDeleteTemporaryUploadFile() {
+        videoStorageService.appendChunk("upload-delete", "chunk".getBytes());
+        assertTrue(videoStorageService.getTempUploadSize("upload-delete") > 0L);
+
+        videoStorageService.deleteTempUpload("upload-delete");
+
+        assertEquals(0L, videoStorageService.getTempUploadSize("upload-delete"));
     }
 
     private byte[] concat(byte[] first, byte[] second) {
