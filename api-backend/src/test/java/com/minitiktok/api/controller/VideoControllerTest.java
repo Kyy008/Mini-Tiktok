@@ -352,6 +352,27 @@ class VideoControllerTest {
     }
 
     @Test
+    void shouldReturnBadRequestWhenUploadTitleIsBlank() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "demo.mp4",
+                "video/mp4",
+                "video-content".getBytes());
+
+        mockMvc.perform(multipart("/api/videos")
+                        .file(file)
+                        .param("title", "   ")
+                        .with(jwt().authorities(() -> "SCOPE_video:write")
+                                .jwt(jwt -> jwt
+                                        .subject("1")
+                                        .claim("preferred_username", "demo")
+                                        .claim("scope", "video:write"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value("Video title must not be blank"));
+    }
+
+    @Test
     void shouldCreateTwoVideoRecordsForSameStoredFileAcrossTwoUploads() throws Exception {
         MockMultipartFile firstFile = new MockMultipartFile(
                 "file",

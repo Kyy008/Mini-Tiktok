@@ -40,4 +40,16 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(status)
                 .body(Result.failure(status.value(), message));
     }
+
+    @ExceptionHandler(VideoNotFoundException.class)
+    public ResponseEntity<Result<Void>> handleVideoNotFound(VideoNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Result.failure(HttpStatus.NOT_FOUND.value(), ex.getMessage()));
+    }
+
+    @ExceptionHandler(ForbiddenVideoOperationException.class)
+    public ResponseEntity<Result<Void>> handleForbiddenVideoOperation(ForbiddenVideoOperationException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Result.failure(HttpStatus.FORBIDDEN.value(), ex.getMessage()));
+    }
 }

@@ -6,8 +6,9 @@ import com.minitiktok.api.dto.UploadVideoResponse;
 import com.minitiktok.api.dto.VideoDetailResponse;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.minitiktok.api.entity.Video;
+import com.minitiktok.api.exception.ForbiddenVideoOperationException;
+import com.minitiktok.api.exception.VideoNotFoundException;
 import java.util.List;
-import java.util.Optional;
 import com.minitiktok.api.security.CurrentUserService;
 import com.minitiktok.api.service.VideoService;
 import com.minitiktok.api.storage.StoredVideoFile;
@@ -17,7 +18,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -31,27 +31,26 @@ import org.springframework.web.multipart.MultipartFile;
 public class VideoController {
 
     private static final int MAX_TITLE_LENGTH = 128;
-    private static final String VIDEO_NOT_FOUND_MESSAGE = "video not found";
 
     private final CurrentUserService currentUserService;
     private final VideoStorageService videoStorageService;
     private final VideoService videoService;
 
     @GetMapping("/api/videos/{id}")
-    public ResponseEntity<Result<VideoDetailResponse>> getVideoDetail(@PathVariable("id") Long id) {
-        return videoService.findActiveById(id)
-                .map(video -> ResponseEntity.ok(Result.success(toVideoDetailResponse(video))))
-                .orElseGet(this::videoNotFound);
+    public Result<VideoDetailResponse> getVideoDetail(@PathVariable("id") Long id) {
+        Video video = videoService.findActiveById(id)
+                .orElseThrow(VideoNotFoundException::new);
+        return Result.success(toVideoDetailResponse(video));
     }
 
     @GetMapping("/api/videos/{id}/play")
-    public ResponseEntity<Resource> playVideo(@PathVariable("id") Long id) {
+    public org.springframework.http.ResponseEntity<Resource> playVideo(@PathVariable("id") Long id) {
         return videoService.findActiveById(id)
                 .flatMap(video -> videoStorageService.loadAsResource(video.getFileHash()))
-                .map(resource -> ResponseEntity.ok()
+                .map(resource -> org.springframework.http.ResponseEntity.ok()
                         .contentType(MediaType.valueOf("video/mp4"))
                         .body(resource))
-                .orElseGet(() -> ResponseEntity.notFound().build());
+                .orElseGet(() -> org.springframework.http.ResponseEntity.notFound().build());
     }
 
     @PostMapping("/api/videos")
@@ -97,21 +96,16 @@ public class VideoController {
     }
 
     @DeleteMapping("/api/videos/{id}")
-    public ResponseEntity<Result<Void>> deleteVideo(@PathVariable("id") Long id) {
-        Optional<Video> videoOptional = videoService.findActiveById(id);
-        if (videoOptional.isEmpty()) {
-            return videoNotFoundForDelete();
-        }
-
-        Video video = videoOptional.get();
+    public Result<Void> deleteVideo(@PathVariable("id") Long id) {
+        Video video = videoService.findActiveById(id)
+                .orElseThrow(VideoNotFoundException::new);
         String currentUserId = currentUserService.getCurrentUser().userId();
         if (!video.getUploaderId().equals(currentUserId)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(Result.failure(HttpStatus.FORBIDDEN.value(), "forbidden"));
+            throw new ForbiddenVideoOperationException();
         }
 
         videoService.softDeleteById(id);
-        return ResponseEntity.ok(Result.success());
+        return Result.success();
     }
 
     private String normalizeTitle(String title) {
@@ -153,15 +147,5 @@ public class VideoController {
         if (size < 1) {
             throw new IllegalArgumentException("Page size must be greater than or equal to 1");
         }
-    }
-
-    private ResponseEntity<Result<VideoDetailResponse>> videoNotFound() {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(Result.failure(HttpStatus.NOT_FOUND.value(), VIDEO_NOT_FOUND_MESSAGE));
-    }
-
-    private ResponseEntity<Result<Void>> videoNotFoundForDelete() {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(Result.failure(HttpStatus.NOT_FOUND.value(), VIDEO_NOT_FOUND_MESSAGE));
     }
 }

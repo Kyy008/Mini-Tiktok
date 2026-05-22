@@ -124,6 +124,38 @@ class VideoUploadControllerTest {
     }
 
     @Test
+    void shouldReturnNotFoundWhenUploadSessionDoesNotExist() throws Exception {
+        when(videoUploadSessionService.getUploadStatus("missing-upload", "1"))
+                .thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "upload session not found"));
+
+        mockMvc.perform(get("/api/video-uploads/missing-upload")
+                        .with(jwt().authorities(() -> "SCOPE_video:write")
+                                .jwt(jwt -> jwt.subject("1")
+                                        .claim("preferred_username", "demo")
+                                        .claim("scope", "video:write"))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(404))
+                .andExpect(jsonPath("$.message").value("upload session not found"));
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenUploadCompletionInputIsInvalid() throws Exception {
+        when(videoUploadSessionService.uploadChunk(eq("upload123"), eq(0), any(), eq("1")))
+                .thenThrow(new IllegalArgumentException("Upload chunk must not be empty"));
+
+        mockMvc.perform(put("/api/video-uploads/upload123/chunks/0")
+                        .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                        .content("x".getBytes())
+                        .with(jwt().authorities(() -> "SCOPE_video:write")
+                                .jwt(jwt -> jwt.subject("1")
+                                        .claim("preferred_username", "demo")
+                                        .claim("scope", "video:write"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value("Upload chunk must not be empty"));
+    }
+
+    @Test
     void shouldCompleteUploadWhenUserHasVideoWriteScope() throws Exception {
         when(videoUploadSessionService.completeUpload("upload123", "1"))
                 .thenReturn(new UploadVideoResponse(
