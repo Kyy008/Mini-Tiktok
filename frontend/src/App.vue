@@ -14,8 +14,16 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted } from 'vue'
 import { useRoute } from 'vue-router'
+
 import TabBar from './components/TabBar.vue'
+import { useAuthStore } from './stores/auth'
 
 const route = useRoute()
+const authStore = useAuthStore()
+
+onMounted(() => {
+  void authStore.restore()
+})
 </script>

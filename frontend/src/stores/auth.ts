@@ -1,23 +1,123 @@
-// 登录状态管理。当前为 Mock 实现：默认已登录，便于演示。
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
-import type { UserInfo } from '../api/types'
-import { CURRENT_USER } from '../mock/data'
 
-export const useAuthStore = defineStore('auth', () => {
-  const user = ref<UserInfo | null>(CURRENT_USER)
-  const accessToken = ref<string | null>('mock-token')
+import {
+  authErrorMessage,
+  buildAuthorizationUrl,
+  exchangeCodeForToken,
+  fetchCurrentUser,
+} from '../api/auth'
+import type { CurrentUser } from '../api/types'
+import { createPkceParams } from '../utils/pkce'
+import {
+  clearAuthStorage,
+  clearPkce,
+  getAccessToken,
+  getCurrentUserFromStorage,
+  getPkce,
+  saveAccessToken,
+  saveCurrentUser,
+  savePkce,
+} from '../utils/token'
 
-  function login() {
-    // Mock：直接置为已登录。真实流程走 OAuth2 PKCE 跳转。
-    user.value = CURRENT_USER
-    accessToken.value = 'mock-token'
-  }
+interface AuthState {
+  accessToken: string | null
+  user: CurrentUser | null
+  loading: boolean
+  error: string | null
+}
 
-  function logout() {
-    user.value = null
-    accessToken.value = null
-  }
+export const useAuthStore = defineStore('auth', {
+  state: (): AuthState => ({
+    accessToken: getAccessToken(),
+    user: getCurrentUserFromStorage(),
+    loading: false,
+    error: null,
+  }),
+  getters: {
+    isAuthenticated: (state) => Boolean(state.accessToken && state.user),
+  },
+  actions: {
+    async login() {
+      this.error = null
+      const pkce = await createPkceParams()
+      savePkce({
+        codeVerifier: pkce.codeVerifier,
+        state: pkce.state,
+      })
+      window.location.assign(
+        buildAuthorizationUrl({
+          codeChallenge: pkce.codeChallenge,
+          state: pkce.state,
+        }),
+      )
+    },
+    async handleCallback(code: string, state: string): Promise<CurrentUser> {
+      this.loading = true
+      this.error = null
+      try {
+        const pkce = getPkce()
+        if (!pkce) {
+          throw new Error('本次登录不是从前端登录按钮发起，或登录状态已过期，请重新登录')
+        }
+        if (pkce.state !== state) {
+          throw new Error('登录状态校验失败，请重新登录')
+        }
 
-  return { user, accessToken, login, logout }
+        const token = await exchangeCodeForToken(code, pkce.codeVerifier)
+        saveAccessToken(token.access_token)
+        this.accessToken = token.access_token
+
+        const user = normalizeCurrentUser(await fetchCurrentUser())
+        saveCurrentUser(user)
+        this.user = user
+        clearPkce()
+        return user
+      } catch (error) {
+        clearAuthStorage()
+        this.accessToken = null
+        this.user = null
+        this.error = authErrorMessage(error)
+        throw new Error(this.error)
+      } finally {
+        this.loading = false
+      }
+    },
+    async restore(): Promise<void> {
+      const accessToken = getAccessToken()
+      if (!accessToken) {
+        return
+      }
+
+      this.loading = true
+      this.accessToken = accessToken
+      try {
+        const user = normalizeCurrentUser(await fetchCurrentUser())
+        this.user = user
+        saveCurrentUser(user)
+      } catch {
+        this.logout()
+      } finally {
+        this.loading = false
+      }
+    },
+    logout(): void {
+      clearAuthStorage()
+      this.accessToken = null
+      this.user = null
+      this.error = null
+    },
+  },
 })
+
+function normalizeCurrentUser(user: CurrentUser): CurrentUser {
+  const numericId = Number(user.userId)
+  return {
+    ...user,
+    id: Number.isFinite(numericId) ? numericId : 0,
+    username: user.username || user.userId,
+    avatar:
+      user.avatar ||
+      `https://picsum.photos/seed/${encodeURIComponent(user.userId)}/120/120`,
+    signature: user.signature || '这个人很懒，什么都没写~',
+  }
+}

@@ -38,6 +38,7 @@ logging:
 
 video:
   storage-dir: storage/videos
+  temp-dir: storage/uploads
 
 app:
   cors:
@@ -46,6 +47,7 @@ app:
     allowed-methods:
       - GET
       - POST
+      - PUT
       - DELETE
       - OPTIONS
     allowed-headers:

@@ -1,10 +1,28 @@
 // 前后端数据类型。
 
+export interface ApiResult<T> {
+  code: number
+  message: string
+  data?: T | null
+}
+
 export interface UserInfo {
   id: number
   username: string
   avatar: string
   signature?: string
+}
+
+export interface CurrentUser extends UserInfo {
+  userId: string
+  scopes: string[]
+}
+
+export interface OAuthTokenResponse {
+  access_token: string
+  token_type: string
+  expires_in?: number
+  scope?: string
 }
 
 export interface VideoItem {

@@ -1,0 +1,20 @@
+create table if not exists video_upload_session (
+  id bigint primary key auto_increment,
+  upload_id varchar(64) not null,
+  uploader_id varchar(64) not null,
+  title varchar(128) not null,
+  file_name varchar(255) not null,
+  content_type varchar(64) not null,
+  file_hash varchar(64) not null,
+  file_size bigint not null,
+  chunk_size int not null,
+  total_chunks int not null,
+  next_chunk_index int not null default 0,
+  uploaded_bytes bigint not null default 0,
+  status varchar(16) not null,
+  created_at datetime not null default current_timestamp,
+  updated_at datetime not null default current_timestamp,
+  unique key uk_video_upload_session_upload_id (upload_id),
+  index idx_upload_session_uploader_status (uploader_id, status, updated_at),
+  index idx_upload_session_file_hash (file_hash)
+) engine=InnoDB default charset=utf8mb4 collate=utf8mb4_unicode_ci;
