@@ -11,11 +11,22 @@ public class VideoStorageProperties {
     @NotBlank
     private String storageDir;
 
+    @NotBlank
+    private String tempDir;
+
     public String getStorageDir() {
         return storageDir;
     }
 
     public void setStorageDir(String storageDir) {
         this.storageDir = storageDir;
+    }
+
+    public String getTempDir() {
+        return tempDir;
+    }
+
+    public void setTempDir(String tempDir) {
+        this.tempDir = tempDir;
     }
 }

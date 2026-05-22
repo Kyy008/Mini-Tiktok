@@ -49,6 +49,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/health").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/me").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/video-uploads/init").hasAuthority("SCOPE_video:write")
+                        .requestMatchers(HttpMethod.GET, "/api/video-uploads/**").hasAuthority("SCOPE_video:write")
+                        .requestMatchers(HttpMethod.PUT, "/api/video-uploads/**").hasAuthority("SCOPE_video:write")
+                        .requestMatchers(HttpMethod.POST, "/api/video-uploads/*/complete").hasAuthority("SCOPE_video:write")
                         .requestMatchers(HttpMethod.GET, "/api/videos/**").hasAuthority("SCOPE_video:read")
                         .requestMatchers(HttpMethod.POST, "/api/videos").hasAuthority("SCOPE_video:write")
                         .anyRequest().authenticated())
@@ -109,7 +113,7 @@ public class SecurityConfig {
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of("http://localhost:5173"));
-        configuration.setAllowedMethods(List.of("GET", "POST", "DELETE", "OPTIONS"));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Content-Type", "Authorization"));
         configuration.setAllowCredentials(true);
 

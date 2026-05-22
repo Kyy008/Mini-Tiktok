@@ -1,3 +1,6 @@
+video:
+  temp-dir: storage/uploads
+
 mock-auth:
   enabled: true
   tokens:
