@@ -6,7 +6,9 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -17,13 +19,16 @@ import com.minitiktok.api.service.VideoService;
 import com.minitiktok.api.storage.StoredVideoFile;
 import com.minitiktok.api.storage.VideoStorageService;
 import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -39,6 +44,105 @@ class VideoControllerTest {
 
     @MockBean
     private VideoService videoService;
+
+    @Test
+    void shouldReturnVideoDetailWhenUserHasVideoReadScope() throws Exception {
+        when(videoService.findActiveById(1L)).thenReturn(Optional.of(Video.builder()
+                .id(1L)
+                .title("Demo Video")
+                .fileHash("hash123")
+                .uploaderId("uploader-1")
+                .deleted(false)
+                .createdAt(LocalDateTime.of(2026, 5, 20, 12, 0))
+                .build()));
+
+        mockMvc.perform(get("/api/videos/1")
+                        .with(jwt().authorities(() -> "SCOPE_video:read")
+                                .jwt(jwt -> jwt
+                                        .subject("1")
+                                        .claim("preferred_username", "demo")
+                                        .claim("scope", "video:read"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.message").value("success"))
+                .andExpect(jsonPath("$.data.id").value(1))
+                .andExpect(jsonPath("$.data.title").value("Demo Video"))
+                .andExpect(jsonPath("$.data.playUrl").value("/api/videos/1/play"))
+                .andExpect(jsonPath("$.data.createdAt").value("2026-05-20T12:00:00"))
+                .andExpect(jsonPath("$.data.uploaderId").value("uploader-1"));
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenVideoDetailDoesNotExist() throws Exception {
+        when(videoService.findActiveById(99L)).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/api/videos/99")
+                        .with(jwt().authorities(() -> "SCOPE_video:read")
+                                .jwt(jwt -> jwt
+                                        .subject("1")
+                                        .claim("preferred_username", "demo")
+                                        .claim("scope", "video:read"))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(404))
+                .andExpect(jsonPath("$.message").value("video not found"));
+    }
+
+    @Test
+    void shouldStreamVideoFileWhenUserHasVideoReadScope() throws Exception {
+        byte[] videoContent = "video-binary".getBytes(StandardCharsets.UTF_8);
+        when(videoService.findActiveById(1L)).thenReturn(Optional.of(Video.builder()
+                .id(1L)
+                .title("Demo Video")
+                .fileHash("hash123")
+                .uploaderId("uploader-1")
+                .deleted(false)
+                .createdAt(LocalDateTime.of(2026, 5, 20, 12, 0))
+                .build()));
+        when(videoStorageService.loadAsResource("hash123"))
+                .thenReturn(Optional.of(new ByteArrayResource(videoContent)));
+
+        mockMvc.perform(get("/api/videos/1/play")
+                        .with(jwt().authorities(() -> "SCOPE_video:read")
+                                .jwt(jwt -> jwt
+                                        .subject("1")
+                                        .claim("preferred_username", "demo")
+                                        .claim("scope", "video:read"))))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType("video/mp4"))
+                .andExpect(content().bytes(videoContent));
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenStoredVideoFileIsMissing() throws Exception {
+        when(videoService.findActiveById(1L)).thenReturn(Optional.of(Video.builder()
+                .id(1L)
+                .title("Demo Video")
+                .fileHash("missing-hash")
+                .uploaderId("uploader-1")
+                .deleted(false)
+                .createdAt(LocalDateTime.of(2026, 5, 20, 12, 0))
+                .build()));
+        when(videoStorageService.loadAsResource("missing-hash")).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/api/videos/1/play")
+                        .with(jwt().authorities(() -> "SCOPE_video:read")
+                                .jwt(jwt -> jwt
+                                        .subject("1")
+                                        .claim("preferred_username", "demo")
+                                        .claim("scope", "video:read"))))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldReturnForbiddenForReadEndpointsWithoutVideoReadScope() throws Exception {
+        mockMvc.perform(get("/api/videos/1")
+                        .with(jwt().authorities(() -> "SCOPE_video:write")
+                                .jwt(jwt -> jwt
+                                        .subject("1")
+                                        .claim("preferred_username", "demo")
+                                        .claim("scope", "video:write"))))
+                .andExpect(status().isForbidden());
+    }
 
     @Test
     void shouldUploadVideoWhenUserHasVideoWriteScope() throws Exception {

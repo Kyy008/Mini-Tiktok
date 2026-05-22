@@ -37,6 +37,7 @@ public class MockAuthSecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/health").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/me").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/videos/**").hasAuthority("SCOPE_video:read")
                         .requestMatchers(HttpMethod.POST, "/api/videos").hasAuthority("SCOPE_video:write")
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2

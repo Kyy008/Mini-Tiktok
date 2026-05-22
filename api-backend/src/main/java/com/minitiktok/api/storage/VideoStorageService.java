@@ -8,6 +8,9 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.Locale;
+import java.util.Optional;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -29,7 +32,7 @@ public class VideoStorageService {
         byte[] content = readBytes(file);
         String fileHash = sha256Hex(content);
         Path storageDir = resolveStorageDir();
-        Path absolutePath = storageDir.resolve(fileHash + MP4_EXTENSION).toAbsolutePath().normalize();
+        Path absolutePath = resolveStoredFilePath(fileHash);
 
         try {
             Files.createDirectories(storageDir);
@@ -46,6 +49,14 @@ public class VideoStorageService {
                 absolutePath,
                 file.getContentType(),
                 file.getSize());
+    }
+
+    public Optional<Resource> loadAsResource(String fileHash) {
+        Path storedFilePath = resolveStoredFilePath(fileHash);
+        if (!Files.exists(storedFilePath) || !Files.isRegularFile(storedFilePath)) {
+            return Optional.empty();
+        }
+        return Optional.of(new FileSystemResource(storedFilePath));
     }
 
     private void validateFile(MultipartFile file) {
@@ -86,5 +97,9 @@ public class VideoStorageService {
 
     private Path resolveStorageDir() {
         return Path.of(storageProperties.getStorageDir()).toAbsolutePath().normalize();
+    }
+
+    private Path resolveStoredFilePath(String fileHash) {
+        return resolveStorageDir().resolve(fileHash + MP4_EXTENSION).toAbsolutePath().normalize();
     }
 }
