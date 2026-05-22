@@ -4,7 +4,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -200,6 +202,89 @@ class VideoControllerTest {
         mockMvc.perform(get("/api/my/videos")
                         .param("page", "1")
                         .param("size", "10"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldDeleteVideoWhenUserOwnsItAndHasVideoWriteScope() throws Exception {
+        when(videoService.findActiveById(1L)).thenReturn(Optional.of(Video.builder()
+                .id(1L)
+                .title("Owned Video")
+                .fileHash("hash123")
+                .uploaderId("1")
+                .deleted(false)
+                .createdAt(LocalDateTime.of(2026, 5, 22, 12, 0))
+                .build()));
+        when(videoService.softDeleteById(1L)).thenReturn(true);
+
+        mockMvc.perform(delete("/api/videos/1")
+                        .with(jwt().authorities(() -> "SCOPE_video:write")
+                                .jwt(jwt -> jwt
+                                        .subject("1")
+                                        .claim("preferred_username", "demo")
+                                        .claim("scope", "video:write"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.message").value("success"));
+
+        verify(videoService).softDeleteById(1L);
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenDeletingMissingVideo() throws Exception {
+        when(videoService.findActiveById(99L)).thenReturn(Optional.empty());
+
+        mockMvc.perform(delete("/api/videos/99")
+                        .with(jwt().authorities(() -> "SCOPE_video:write")
+                                .jwt(jwt -> jwt
+                                        .subject("1")
+                                        .claim("preferred_username", "demo")
+                                        .claim("scope", "video:write"))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(404))
+                .andExpect(jsonPath("$.message").value("video not found"));
+
+        verify(videoService, never()).softDeleteById(any());
+    }
+
+    @Test
+    void shouldReturnForbiddenWhenDeletingOthersVideo() throws Exception {
+        when(videoService.findActiveById(2L)).thenReturn(Optional.of(Video.builder()
+                .id(2L)
+                .title("Others Video")
+                .fileHash("hash999")
+                .uploaderId("other-user")
+                .deleted(false)
+                .createdAt(LocalDateTime.of(2026, 5, 22, 12, 0))
+                .build()));
+
+        mockMvc.perform(delete("/api/videos/2")
+                        .with(jwt().authorities(() -> "SCOPE_video:write")
+                                .jwt(jwt -> jwt
+                                        .subject("1")
+                                        .claim("preferred_username", "demo")
+                                        .claim("scope", "video:write"))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value(403))
+                .andExpect(jsonPath("$.message").value("forbidden"));
+
+        verify(videoService, never()).softDeleteById(any());
+    }
+
+    @Test
+    void shouldReturnForbiddenWhenDeletingWithoutVideoWriteScope() throws Exception {
+        mockMvc.perform(delete("/api/videos/1")
+                        .with(jwt().authorities(() -> "SCOPE_video:read")
+                                .jwt(jwt -> jwt
+                                        .subject("1")
+                                        .claim("preferred_username", "demo")
+                                        .claim("scope", "video:read"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldReturnUnauthorizedWhenDeletingWithoutAuthentication() throws Exception {
+        mockMvc.perform(delete("/api/videos/1"))
                 .andExpect(status().isUnauthorized());
     }
 

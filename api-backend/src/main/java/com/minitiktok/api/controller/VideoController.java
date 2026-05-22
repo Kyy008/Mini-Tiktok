@@ -7,6 +7,7 @@ import com.minitiktok.api.dto.VideoDetailResponse;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.minitiktok.api.entity.Video;
 import java.util.List;
+import java.util.Optional;
 import com.minitiktok.api.security.CurrentUserService;
 import com.minitiktok.api.service.VideoService;
 import com.minitiktok.api.storage.StoredVideoFile;
@@ -17,6 +18,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -94,6 +96,24 @@ public class VideoController {
                 videoPage.getTotal()));
     }
 
+    @DeleteMapping("/api/videos/{id}")
+    public ResponseEntity<Result<Void>> deleteVideo(@PathVariable("id") Long id) {
+        Optional<Video> videoOptional = videoService.findActiveById(id);
+        if (videoOptional.isEmpty()) {
+            return videoNotFoundForDelete();
+        }
+
+        Video video = videoOptional.get();
+        String currentUserId = currentUserService.getCurrentUser().userId();
+        if (!video.getUploaderId().equals(currentUserId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Result.failure(HttpStatus.FORBIDDEN.value(), "forbidden"));
+        }
+
+        videoService.softDeleteById(id);
+        return ResponseEntity.ok(Result.success());
+    }
+
     private String normalizeTitle(String title) {
         if (title == null) {
             throw new IllegalArgumentException("Video title must not be blank");
@@ -136,6 +156,11 @@ public class VideoController {
     }
 
     private ResponseEntity<Result<VideoDetailResponse>> videoNotFound() {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Result.failure(HttpStatus.NOT_FOUND.value(), VIDEO_NOT_FOUND_MESSAGE));
+    }
+
+    private ResponseEntity<Result<Void>> videoNotFoundForDelete() {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(Result.failure(HttpStatus.NOT_FOUND.value(), VIDEO_NOT_FOUND_MESSAGE));
     }

@@ -2,8 +2,10 @@ package com.minitiktok.api.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -142,6 +144,36 @@ class MockAuthModeVideoControllerTest {
                 .andExpect(jsonPath("$.data.records[0].id").value(21))
                 .andExpect(jsonPath("$.data.records[0].title").value("Uploader Video"))
                 .andExpect(jsonPath("$.data.records[0].playUrl").value("/api/videos/21/play"));
+    }
+
+    @Test
+    void shouldDeleteVideoWhenUsingMockVideoWriteToken() throws Exception {
+        when(videoService.findActiveById(1L)).thenReturn(Optional.of(Video.builder()
+                .id(1L)
+                .title("Demo Video")
+                .fileHash("hash123")
+                .uploaderId("local-uploader")
+                .deleted(false)
+                .createdAt(LocalDateTime.of(2026, 5, 20, 12, 0))
+                .build()));
+        when(videoService.softDeleteById(1L)).thenReturn(true);
+
+        mockMvc.perform(delete("/api/videos/1")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer mock-video-write"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.message").value("success"));
+
+        verify(videoService).softDeleteById(1L);
+    }
+
+    @Test
+    void shouldReturnForbiddenWhenUsingMockVideoReadTokenForDelete() throws Exception {
+        mockMvc.perform(delete("/api/videos/1")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer mock-video-read"))
+                .andExpect(status().isForbidden());
+
+        verify(videoService, never()).softDeleteById(any());
     }
 
     @Test
