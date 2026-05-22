@@ -1,9 +1,12 @@
 package com.minitiktok.api.controller;
 
 import com.minitiktok.api.dto.Result;
+import com.minitiktok.api.dto.MyVideosPageResponse;
 import com.minitiktok.api.dto.UploadVideoResponse;
 import com.minitiktok.api.dto.VideoDetailResponse;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.minitiktok.api.entity.Video;
+import java.util.List;
 import com.minitiktok.api.security.CurrentUserService;
 import com.minitiktok.api.service.VideoService;
 import com.minitiktok.api.storage.StoredVideoFile;
@@ -72,6 +75,25 @@ public class VideoController {
         return Result.success(response);
     }
 
+    @GetMapping("/api/my/videos")
+    public Result<MyVideosPageResponse> getMyVideos(
+            @RequestParam(name = "page", defaultValue = "1") long page,
+            @RequestParam(name = "size", defaultValue = "10") long size) {
+        validatePagination(page, size);
+
+        String uploaderId = currentUserService.getCurrentUser().userId();
+        Page<Video> videoPage = videoService.pageActiveByUploaderId(uploaderId, page, size);
+        List<MyVideosPageResponse.VideoItem> records = videoPage.getRecords().stream()
+                .map(this::toMyVideosItem)
+                .toList();
+
+        return Result.success(new MyVideosPageResponse(
+                records,
+                videoPage.getCurrent(),
+                videoPage.getSize(),
+                videoPage.getTotal()));
+    }
+
     private String normalizeTitle(String title) {
         if (title == null) {
             throw new IllegalArgumentException("Video title must not be blank");
@@ -94,6 +116,23 @@ public class VideoController {
                 "/api/videos/" + video.getId() + "/play",
                 video.getCreatedAt(),
                 video.getUploaderId());
+    }
+
+    private MyVideosPageResponse.VideoItem toMyVideosItem(Video video) {
+        return new MyVideosPageResponse.VideoItem(
+                video.getId(),
+                video.getTitle(),
+                "/api/videos/" + video.getId() + "/play",
+                video.getCreatedAt());
+    }
+
+    private void validatePagination(long page, long size) {
+        if (page < 1) {
+            throw new IllegalArgumentException("Page number must be greater than or equal to 1");
+        }
+        if (size < 1) {
+            throw new IllegalArgumentException("Page size must be greater than or equal to 1");
+        }
     }
 
     private ResponseEntity<Result<VideoDetailResponse>> videoNotFound() {

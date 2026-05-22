@@ -13,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.minitiktok.api.config.SecurityConfig;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.minitiktok.api.entity.Video;
 import com.minitiktok.api.security.CurrentUserService;
 import com.minitiktok.api.service.VideoService;
@@ -142,6 +143,64 @@ class VideoControllerTest {
                                         .claim("preferred_username", "demo")
                                         .claim("scope", "video:write"))))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldReturnMyVideosPageForAuthenticatedUser() throws Exception {
+        when(videoService.pageActiveByUploaderId("1", 2L, 1L))
+                .thenReturn(new Page<Video>(2, 1, 3)
+                        .setRecords(java.util.List.of(
+                                Video.builder()
+                                        .id(10L)
+                                        .title("My Video")
+                                        .fileHash("hash123")
+                                        .uploaderId("1")
+                                        .deleted(false)
+                                        .createdAt(LocalDateTime.of(2026, 5, 22, 10, 0))
+                                        .build())));
+
+        mockMvc.perform(get("/api/my/videos")
+                        .param("page", "2")
+                        .param("size", "1")
+                        .with(jwt().authorities(() -> "SCOPE_video:read")
+                                .jwt(jwt -> jwt
+                                        .subject("1")
+                                        .claim("preferred_username", "demo")
+                                        .claim("scope", "video:read"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.message").value("success"))
+                .andExpect(jsonPath("$.data.page").value(2))
+                .andExpect(jsonPath("$.data.size").value(1))
+                .andExpect(jsonPath("$.data.total").value(3))
+                .andExpect(jsonPath("$.data.records.length()").value(1))
+                .andExpect(jsonPath("$.data.records[0].id").value(10))
+                .andExpect(jsonPath("$.data.records[0].title").value("My Video"))
+                .andExpect(jsonPath("$.data.records[0].playUrl").value("/api/videos/10/play"))
+                .andExpect(jsonPath("$.data.records[0].createdAt").value("2026-05-22T10:00:00"));
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenMyVideosPageParameterIsInvalid() throws Exception {
+        mockMvc.perform(get("/api/my/videos")
+                        .param("page", "0")
+                        .param("size", "10")
+                        .with(jwt().authorities(() -> "SCOPE_video:read")
+                                .jwt(jwt -> jwt
+                                        .subject("1")
+                                        .claim("preferred_username", "demo")
+                                        .claim("scope", "video:read"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value("Page number must be greater than or equal to 1"));
+    }
+
+    @Test
+    void shouldReturnUnauthorizedForMyVideosWhenUserIsNotAuthenticated() throws Exception {
+        mockMvc.perform(get("/api/my/videos")
+                        .param("page", "1")
+                        .param("size", "10"))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
