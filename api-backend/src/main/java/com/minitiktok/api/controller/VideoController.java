@@ -8,6 +8,10 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.minitiktok.api.entity.Video;
 import com.minitiktok.api.exception.ForbiddenVideoOperationException;
 import com.minitiktok.api.exception.VideoNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import com.minitiktok.api.security.CurrentUserService;
 import com.minitiktok.api.service.VideoService;
@@ -15,13 +19,19 @@ import com.minitiktok.api.storage.StoredVideoFile;
 import com.minitiktok.api.storage.VideoStorageService;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpRange;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -51,6 +61,51 @@ public class VideoController {
                         .contentType(MediaType.valueOf("video/mp4"))
                         .body(resource))
                 .orElseGet(() -> org.springframework.http.ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/api/videos/{id}/stream")
+    public ResponseEntity<Resource> streamVideo(
+            @PathVariable("id") Long id,
+            @RequestHeader(value = HttpHeaders.RANGE, required = false) String rangeHeader) {
+        Video video = videoService.findActiveById(id)
+                .orElseThrow(VideoNotFoundException::new);
+        Path videoPath = videoStorageService.loadAsPath(video.getFileHash())
+                .orElseThrow(VideoNotFoundException::new);
+
+        try {
+            long contentLength = Files.size(videoPath);
+            if (rangeHeader == null || rangeHeader.isBlank()) {
+                return ResponseEntity.ok()
+                        .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+                        .contentType(MediaType.valueOf("video/mp4"))
+                        .contentLength(contentLength)
+                        .body(new InputStreamResource(Files.newInputStream(videoPath)));
+            }
+
+            List<HttpRange> ranges = HttpRange.parseRanges(rangeHeader);
+            if (ranges.size() != 1) {
+                return requestedRangeNotSatisfiable(contentLength);
+            }
+
+            HttpRange range = ranges.get(0);
+            long start = range.getRangeStart(contentLength);
+            long end = range.getRangeEnd(contentLength);
+            if (start < 0 || end < start || end >= contentLength) {
+                return requestedRangeNotSatisfiable(contentLength);
+            }
+
+            byte[] partialContent = readRange(videoPath, start, end);
+            return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT)
+                    .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+                    .header(HttpHeaders.CONTENT_RANGE, "bytes " + start + "-" + end + "/" + contentLength)
+                    .contentType(MediaType.valueOf("video/mp4"))
+                    .contentLength(partialContent.length)
+                    .body(new ByteArrayResource(partialContent));
+        } catch (IllegalArgumentException ex) {
+            return requestedRangeNotSatisfiable(safeFileSize(videoPath));
+        } catch (IOException ex) {
+            throw new IllegalStateException("Failed to stream video file", ex);
+        }
     }
 
     @PostMapping("/api/videos")
@@ -138,6 +193,34 @@ public class VideoController {
                 video.getTitle(),
                 "/api/videos/" + video.getId() + "/play",
                 video.getCreatedAt());
+    }
+
+    private ResponseEntity<Resource> requestedRangeNotSatisfiable(long contentLength) {
+        return ResponseEntity.status(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
+                .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+                .header(HttpHeaders.CONTENT_RANGE, "bytes */" + contentLength)
+                .build();
+    }
+
+    private byte[] readRange(Path videoPath, long start, long end) throws IOException {
+        int length = Math.toIntExact(end - start + 1);
+        byte[] buffer = new byte[length];
+        try (InputStream inputStream = Files.newInputStream(videoPath)) {
+            inputStream.skipNBytes(start);
+            int bytesRead = inputStream.readNBytes(buffer, 0, length);
+            if (bytesRead != length) {
+                throw new IOException("Unexpected end of file while reading video range");
+            }
+        }
+        return buffer;
+    }
+
+    private long safeFileSize(Path videoPath) {
+        try {
+            return Files.size(videoPath);
+        } catch (IOException ex) {
+            return 0L;
+        }
     }
 
     private void validatePagination(long page, long size) {

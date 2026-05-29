@@ -69,6 +69,14 @@ public class VideoStorageService {
         return Optional.of(new FileSystemResource(storedFilePath));
     }
 
+    public Optional<Path> loadAsPath(String fileHash) {
+        Path storedFilePath = resolveStoredFilePath(fileHash);
+        if (!Files.exists(storedFilePath) || !Files.isRegularFile(storedFilePath)) {
+            return Optional.empty();
+        }
+        return Optional.of(storedFilePath);
+    }
+
     public void appendChunk(String uploadId, byte[] chunkData) {
         if (chunkData == null || chunkData.length == 0) {
             throw new IllegalArgumentException("Upload chunk must not be empty");
