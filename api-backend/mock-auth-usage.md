@@ -114,6 +114,28 @@ curl.exe -i -H "Authorization: Bearer mock-video-read" http://localhost:8085/api
 - 成功时 `Content-Type = video/mp4`
 - 已删除或缺失文件时返回 `404`
 
+验证 HTTP Range 分段播放：
+
+```bash
+curl.exe -i ^
+  -H "Authorization: Bearer mock-video-read" ^
+  -H "Range: bytes=0-4" ^
+  http://localhost:8085/api/videos/1/play
+```
+
+预期关键点：
+
+- 返回 `206 Partial Content`
+- 响应头包含 `Accept-Ranges: bytes`
+- 响应头包含 `Content-Range`
+- 响应体只返回请求的字节区间
+
+说明：
+
+- 这项加分点借鉴“服务端流式响应/大规模数据传输/视频流”的思路
+- 在浏览器视频播放场景里，实际落地为 HTTP Range，而不是 gRPC
+- 当前实现不做应用层限流；后续如需保护播放流量，可再结合令牌桶或并发控制增强
+
 ### 6. 用 `mock-video-read` 查看“我的视频”
 
 ```bash

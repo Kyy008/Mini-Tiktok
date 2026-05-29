@@ -35,6 +35,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -114,6 +115,8 @@ class VideoControllerTest {
                                         .claim("preferred_username", "demo")
                                         .claim("scope", "video:read"))))
                 .andExpect(status().isOk())
+                .andExpect(header().string("Accept-Ranges", "bytes"))
+                .andExpect(header().string("X-Content-Type-Options", "nosniff"))
                 .andExpect(content().contentType("video/mp4"))
                 .andExpect(content().bytes(videoContent));
     }
@@ -155,7 +158,7 @@ class VideoControllerTest {
     }
 
     @Test
-    void shouldStreamWholeVideoWhenUserHasVideoReadScope(@TempDir Path tempDir) throws Exception {
+    void shouldSupportRangePlaybackOnPlayEndpoint(@TempDir Path tempDir) throws Exception {
         byte[] videoContent = "video-binary".getBytes(StandardCharsets.UTF_8);
         Path videoPath = tempDir.resolve("hash123.mp4");
         Files.write(videoPath, videoContent);
@@ -167,9 +170,9 @@ class VideoControllerTest {
                 .deleted(false)
                 .createdAt(LocalDateTime.of(2026, 5, 20, 12, 0))
                 .build()));
-        when(videoStorageService.loadAsPath("hash123")).thenReturn(Optional.of(videoPath));
+        when(videoStorageService.loadAsResource("hash123")).thenReturn(Optional.of(new FileSystemResource(videoPath)));
 
-        mockMvc.perform(get("/api/videos/1/stream")
+        mockMvc.perform(get("/api/videos/1/play")
                         .with(jwt().authorities(() -> "SCOPE_video:read")
                                 .jwt(jwt -> jwt
                                         .subject("1")
@@ -177,12 +180,13 @@ class VideoControllerTest {
                                         .claim("scope", "video:read"))))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Accept-Ranges", "bytes"))
+                .andExpect(header().string("X-Content-Type-Options", "nosniff"))
                 .andExpect(content().contentType("video/mp4"))
                 .andExpect(content().bytes(videoContent));
     }
 
     @Test
-    void shouldStreamVideoRangeWhenUserHasVideoReadScope(@TempDir Path tempDir) throws Exception {
+    void shouldReturnPartialContentForExplicitRangeOnPlayEndpoint(@TempDir Path tempDir) throws Exception {
         byte[] videoContent = "video-binary".getBytes(StandardCharsets.UTF_8);
         Path videoPath = tempDir.resolve("hash123.mp4");
         Files.write(videoPath, videoContent);
@@ -194,9 +198,9 @@ class VideoControllerTest {
                 .deleted(false)
                 .createdAt(LocalDateTime.of(2026, 5, 20, 12, 0))
                 .build()));
-        when(videoStorageService.loadAsPath("hash123")).thenReturn(Optional.of(videoPath));
+        when(videoStorageService.loadAsResource("hash123")).thenReturn(Optional.of(new FileSystemResource(videoPath)));
 
-        mockMvc.perform(get("/api/videos/1/stream")
+        mockMvc.perform(get("/api/videos/1/play")
                         .header("Range", "bytes=0-4")
                         .with(jwt().authorities(() -> "SCOPE_video:read")
                                 .jwt(jwt -> jwt
@@ -211,7 +215,7 @@ class VideoControllerTest {
     }
 
     @Test
-    void shouldReturnRequestedRangeNotSatisfiableWhenRangeExceedsFileLength(@TempDir Path tempDir) throws Exception {
+    void shouldReturnPartialContentForOpenEndedRangeOnPlayEndpoint(@TempDir Path tempDir) throws Exception {
         byte[] videoContent = "video-binary".getBytes(StandardCharsets.UTF_8);
         Path videoPath = tempDir.resolve("hash123.mp4");
         Files.write(videoPath, videoContent);
@@ -223,10 +227,69 @@ class VideoControllerTest {
                 .deleted(false)
                 .createdAt(LocalDateTime.of(2026, 5, 20, 12, 0))
                 .build()));
-        when(videoStorageService.loadAsPath("hash123")).thenReturn(Optional.of(videoPath));
+        when(videoStorageService.loadAsResource("hash123")).thenReturn(Optional.of(new FileSystemResource(videoPath)));
 
-        mockMvc.perform(get("/api/videos/1/stream")
-                        .header("Range", "bytes=100-200")
+        mockMvc.perform(get("/api/videos/1/play")
+                        .header("Range", "bytes=6-")
+                        .with(jwt().authorities(() -> "SCOPE_video:read")
+                                .jwt(jwt -> jwt
+                                        .subject("1")
+                                        .claim("preferred_username", "demo")
+                                        .claim("scope", "video:read"))))
+                .andExpect(status().isPartialContent())
+                .andExpect(header().string("Accept-Ranges", "bytes"))
+                .andExpect(header().string("Content-Range", "bytes 6-11/" + videoContent.length))
+                .andExpect(content().contentType("video/mp4"))
+                .andExpect(content().bytes("binary".getBytes(StandardCharsets.UTF_8)));
+    }
+
+    @Test
+    void shouldReturnPartialContentForSuffixRangeOnPlayEndpoint(@TempDir Path tempDir) throws Exception {
+        byte[] videoContent = "video-binary".getBytes(StandardCharsets.UTF_8);
+        Path videoPath = tempDir.resolve("hash123.mp4");
+        Files.write(videoPath, videoContent);
+        when(videoService.findActiveById(1L)).thenReturn(Optional.of(Video.builder()
+                .id(1L)
+                .title("Demo Video")
+                .fileHash("hash123")
+                .uploaderId("uploader-1")
+                .deleted(false)
+                .createdAt(LocalDateTime.of(2026, 5, 20, 12, 0))
+                .build()));
+        when(videoStorageService.loadAsResource("hash123")).thenReturn(Optional.of(new FileSystemResource(videoPath)));
+
+        mockMvc.perform(get("/api/videos/1/play")
+                        .header("Range", "bytes=-5")
+                        .with(jwt().authorities(() -> "SCOPE_video:read")
+                                .jwt(jwt -> jwt
+                                        .subject("1")
+                                        .claim("preferred_username", "demo")
+                                        .claim("scope", "video:read"))))
+                .andExpect(status().isPartialContent())
+                .andExpect(header().string("Accept-Ranges", "bytes"))
+                .andExpect(header().string("Content-Range", "bytes 7-11/" + videoContent.length))
+                .andExpect(content().contentType("video/mp4"))
+                .andExpect(content().bytes("inary".getBytes(StandardCharsets.UTF_8)));
+    }
+
+    @Test
+    void shouldReturnRequestedRangeNotSatisfiableForOutOfBoundsRangeOnPlayEndpoint(@TempDir Path tempDir)
+            throws Exception {
+        byte[] videoContent = "video-binary".getBytes(StandardCharsets.UTF_8);
+        Path videoPath = tempDir.resolve("hash123.mp4");
+        Files.write(videoPath, videoContent);
+        when(videoService.findActiveById(1L)).thenReturn(Optional.of(Video.builder()
+                .id(1L)
+                .title("Demo Video")
+                .fileHash("hash123")
+                .uploaderId("uploader-1")
+                .deleted(false)
+                .createdAt(LocalDateTime.of(2026, 5, 20, 12, 0))
+                .build()));
+        when(videoStorageService.loadAsResource("hash123")).thenReturn(Optional.of(new FileSystemResource(videoPath)));
+
+        mockMvc.perform(get("/api/videos/1/play")
+                        .header("Range", "bytes=999-1000")
                         .with(jwt().authorities(() -> "SCOPE_video:read")
                                 .jwt(jwt -> jwt
                                         .subject("1")
@@ -238,31 +301,8 @@ class VideoControllerTest {
     }
 
     @Test
-    void shouldReturnNotFoundWhenStreamedVideoFileIsMissing() throws Exception {
-        when(videoService.findActiveById(1L)).thenReturn(Optional.of(Video.builder()
-                .id(1L)
-                .title("Demo Video")
-                .fileHash("missing-hash")
-                .uploaderId("uploader-1")
-                .deleted(false)
-                .createdAt(LocalDateTime.of(2026, 5, 20, 12, 0))
-                .build()));
-        when(videoStorageService.loadAsPath("missing-hash")).thenReturn(Optional.empty());
-
-        mockMvc.perform(get("/api/videos/1/stream")
-                        .with(jwt().authorities(() -> "SCOPE_video:read")
-                                .jwt(jwt -> jwt
-                                        .subject("1")
-                                        .claim("preferred_username", "demo")
-                                        .claim("scope", "video:read"))))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value(404))
-                .andExpect(jsonPath("$.message").value("video not found"));
-    }
-
-    @Test
-    void shouldReturnForbiddenForStreamEndpointWithoutVideoReadScope() throws Exception {
-        mockMvc.perform(get("/api/videos/1/stream")
+    void shouldReturnForbiddenForPlayEndpointWithoutVideoReadScope() throws Exception {
+        mockMvc.perform(get("/api/videos/1/play")
                         .with(jwt().authorities(() -> "SCOPE_video:write")
                                 .jwt(jwt -> jwt
                                         .subject("1")
