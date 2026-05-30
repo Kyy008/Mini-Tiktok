@@ -157,6 +157,22 @@ class VideoStorageServiceTest {
     }
 
     @Test
+    void shouldRejectNullUploadChunk() {
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                () -> videoStorageService.appendChunk("upload-null", null));
+
+        assertEquals("Upload chunk must not be empty", exception.getMessage());
+    }
+
+    @Test
+    void shouldRejectEmptyUploadChunk() {
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                () -> videoStorageService.appendChunk("upload-empty", new byte[0]));
+
+        assertEquals("Upload chunk must not be empty", exception.getMessage());
+    }
+
+    @Test
     void shouldRejectFinalizeWhenTempUploadFileDoesNotExist() {
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
                 () -> videoStorageService.storeResumableUpload(
@@ -167,6 +183,21 @@ class VideoStorageServiceTest {
                         12L));
 
         assertEquals("Temporary upload file does not exist", exception.getMessage());
+    }
+
+    @Test
+    void shouldRejectFinalizeWhenDeclaredMetadataIsNotMp4() {
+        videoStorageService.appendChunk("upload-invalid-type", "chunk".getBytes());
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                () -> videoStorageService.storeResumableUpload(
+                        "upload-invalid-type",
+                        "hash123",
+                        "demo.txt",
+                        "text/plain",
+                        5L));
+
+        assertEquals("Only MP4 video files are supported", exception.getMessage());
     }
 
     @Test

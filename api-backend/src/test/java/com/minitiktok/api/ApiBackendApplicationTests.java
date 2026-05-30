@@ -41,6 +41,15 @@ class ApiBackendApplicationTests {
     }
 
     @Test
+    void healthEndpointIsPublic() throws Exception {
+        mockMvc.perform(get("/health"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.message").value("success"))
+                .andExpect(jsonPath("$.data.status").value("ok"));
+    }
+
+    @Test
     void apiMeReturnsCurrentJwtUser() throws Exception {
         mockMvc.perform(get("/api/me")
                         .with(jwt().jwt(jwt -> jwt
