@@ -22,25 +22,37 @@
       </header>
 
       <div class="tabs">
-        <span class="on">作品 {{ myVideos.length }}</span>
+        <span class="on">作品 {{ isAuthenticated ? myVideos.length : 0 }}</span>
         <span>喜欢</span>
         <span>收藏</span>
       </div>
 
-      <div v-if="myVideos.length" class="grid">
-        <div
-          v-for="v in myVideos"
-          :key="v.id"
-          class="cell"
-          @click="play(v)"
-        >
-          <img :src="v.coverUrl" alt="" />
-          <span class="like-tag">
-            ♥ {{ v.likeCount }}
-          </span>
-        </div>
+      <div v-if="!isAuthenticated" class="empty action-empty">
+        登录后查看和管理你的作品
+        <button class="login-inline" type="button" @click="onLogin">登录 / 注册</button>
       </div>
-      <div v-else class="empty">还没有发布作品，去发一个吧~</div>
+      <div v-else-if="loading" class="empty">正在加载作品...</div>
+      <div v-else-if="errorMessage" class="empty action-empty">
+        {{ errorMessage }}
+        <button class="login-inline" type="button" @click="loadVideos">重试</button>
+      </div>
+      <template v-else>
+        <div v-if="myVideos.length" class="grid">
+          <div v-for="v in myVideos" :key="v.id" class="cell" @click="play(v)">
+            <img :src="v.coverUrl" alt="" />
+            <span class="like-tag">♥ {{ v.likeCount }}</span>
+          </div>
+        </div>
+        <button
+          v-if="myVideosHasMore"
+          class="load-more"
+          type="button"
+          @click="loadMore"
+        >
+          加载更多
+        </button>
+        <div v-if="!myVideos.length" class="empty">还没有发布作品，去发一个吧~</div>
+      </template>
     </div>
 
     <transition name="fade">
@@ -53,8 +65,10 @@
           loop
           playsinline
         />
-        <button class="close" @click.stop="current = null">‹</button>
-        <button class="del" @click.stop="remove">删除作品</button>
+        <button class="close" @click.stop="current = null">×</button>
+        <button class="del" :disabled="deleting" @click.stop="remove">
+          {{ deleting ? '删除中...' : '删除作品' }}
+        </button>
         <div class="p-title">{{ current.title }}</div>
       </div>
     </transition>
@@ -62,7 +76,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -73,27 +87,52 @@ import { useDisplayUser } from '../composables/useDisplayUser'
 const router = useRouter()
 const videoStore = useVideoStore()
 const { displayUser, isAuthenticated, authStore } = useDisplayUser()
-const { myVideos } = storeToRefs(videoStore)
+const { myVideos, myVideosHasMore, myVideosPage, myVideosSize, loading, errorMessage } =
+  storeToRefs(videoStore)
 
 const current = ref<VideoItem | null>(null)
+const deleting = ref(false)
 
 function play(v: VideoItem) {
   current.value = v
 }
 
+async function loadVideos() {
+  if (!isAuthenticated.value) return
+  try {
+    await videoStore.loadMyVideos(1, myVideosSize.value)
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '加载作品失败')
+  }
+}
+
+async function loadMore() {
+  if (!isAuthenticated.value || loading.value) return
+  try {
+    await videoStore.loadMyVideos(myVideosPage.value + 1, myVideosSize.value)
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '加载更多失败')
+  }
+}
+
 async function remove() {
-  if (!current.value) return
+  if (!current.value || deleting.value) return
   try {
     await ElMessageBox.confirm('确定删除该作品？', '提示', {
       confirmButtonText: '删除',
       cancelButtonText: '取消',
       type: 'warning',
     })
-    videoStore.deleteVideo(current.value.id)
+    deleting.value = true
+    await videoStore.deleteVideo(current.value.id)
     current.value = null
     ElMessage.success('已删除')
-  } catch {
-    /* 取消 */
+  } catch (error) {
+    if (error instanceof Error) {
+      ElMessage.error(error.message)
+    }
+  } finally {
+    deleting.value = false
   }
 }
 
@@ -104,9 +143,18 @@ function onLogout() {
 }
 
 function onLogin() {
-  // 跳到 auth-backend 走 OAuth2 PKCE
   void authStore.login()
 }
+
+onMounted(() => {
+  void loadVideos()
+})
+
+watch(isAuthenticated, (value) => {
+  if (value) {
+    void loadVideos()
+  }
+})
 </script>
 
 <style scoped>
@@ -245,6 +293,29 @@ function onLogin() {
   font-size: 14px;
 }
 
+.action-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.login-inline,
+.load-more {
+  height: 34px;
+  padding: 0 18px;
+  border-radius: 17px;
+  background: #fe2c55;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.load-more {
+  display: block;
+  margin: 18px auto 32px;
+}
+
 .player {
   position: absolute;
   inset: 0;
@@ -275,6 +346,10 @@ function onLogin() {
   background: rgba(254, 44, 85, 0.85);
   padding: 7px 14px;
   border-radius: 16px;
+}
+
+.del:disabled {
+  opacity: 0.6;
 }
 
 .p-title {
