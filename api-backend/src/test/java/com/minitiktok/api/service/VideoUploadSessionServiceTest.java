@@ -239,6 +239,18 @@ class VideoUploadSessionServiceTest {
     }
 
     @Test
+    void shouldRejectNullChunk() {
+        when(videoUploadSessionMapper.selectOne(any()))
+                .thenReturn(uploadingSession("upload-1", 1, 5L));
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                () -> videoUploadSessionService.uploadChunk("upload-1", 1, null, "uploader-1"));
+
+        assertEquals("Upload chunk must not be empty", exception.getMessage());
+        verify(videoStorageService, never()).appendChunk(any(), any());
+    }
+
+    @Test
     void shouldRejectEmptyChunk() {
         when(videoUploadSessionMapper.selectOne(any()))
                 .thenReturn(uploadingSession("upload-1", 1, 5L));
@@ -247,6 +259,30 @@ class VideoUploadSessionServiceTest {
                 () -> videoUploadSessionService.uploadChunk("upload-1", 1, new byte[0], "uploader-1"));
 
         assertEquals("Upload chunk must not be empty", exception.getMessage());
+        verify(videoStorageService, never()).appendChunk(any(), any());
+    }
+
+    @Test
+    void shouldRejectNegativeChunkIndex() {
+        when(videoUploadSessionMapper.selectOne(any()))
+                .thenReturn(uploadingSession("upload-1", 1, 5L));
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                () -> videoUploadSessionService.uploadChunk("upload-1", -1, "12345".getBytes(), "uploader-1"));
+
+        assertEquals("Chunk index is out of range", exception.getMessage());
+        verify(videoStorageService, never()).appendChunk(any(), any());
+    }
+
+    @Test
+    void shouldRejectChunkIndexAtTotalChunksBoundary() {
+        when(videoUploadSessionMapper.selectOne(any()))
+                .thenReturn(uploadingSession("upload-1", 1, 5L));
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                () -> videoUploadSessionService.uploadChunk("upload-1", 3, "12345".getBytes(), "uploader-1"));
+
+        assertEquals("Chunk index is out of range", exception.getMessage());
         verify(videoStorageService, never()).appendChunk(any(), any());
     }
 
@@ -298,6 +334,19 @@ class VideoUploadSessionServiceTest {
 
         assertEquals(HttpStatus.CONFLICT.value(), exception.getStatusCode().value());
         assertEquals("upload is not complete yet", exception.getReason());
+        verify(videoStorageService, never()).storeResumableUpload(any(), any(), any(), any(), anyLong());
+    }
+
+    @Test
+    void shouldRejectCompleteWhenTemporaryFileSizeDoesNotMatchSessionState() {
+        when(videoUploadSessionMapper.selectOne(any()))
+                .thenReturn(uploadingSession("upload-1", 3, 12L));
+        when(videoStorageService.getTempUploadSize("upload-1")).thenReturn(11L);
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class,
+                () -> videoUploadSessionService.completeUpload("upload-1", "uploader-1"));
+
+        assertEquals("Temporary upload size does not match session state", exception.getMessage());
         verify(videoStorageService, never()).storeResumableUpload(any(), any(), any(), any(), anyLong());
     }
 
