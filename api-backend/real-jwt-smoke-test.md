@@ -117,6 +117,7 @@ curl.exe -i -X POST "http://localhost:8085/api/videos" ^
 
 - `GET /api/videos/{id}`
 - `GET /api/my/videos?page=1&size=10`
+- `GET /api/videos/{id}/play`
 
 推荐先验证“我的视频”：
 
@@ -143,6 +144,22 @@ curl.exe -i ^
 
 - token 含 `video:read` 时返回 `200` 或 `404`
 - scope 不足时返回 `403`
+
+如已知视频 ID，也建议顺手验证播放接口的 HTTP Range：
+
+```bash
+curl.exe -i ^
+  -H "Authorization: Bearer %ACCESS_TOKEN%" ^
+  -H "Range: bytes=0-4" ^
+  http://localhost:8085/api/videos/1/play
+```
+
+预期：
+
+- `206 Partial Content`
+- 响应头包含 `Accept-Ranges: bytes`
+- 响应头包含 `Content-Range`
+- 响应体只返回请求的部分字节
 
 ## 第六步：验证删除接口
 
@@ -174,6 +191,8 @@ curl.exe -i -X DELETE ^
   - `GET /api/videos/{id}` 返回 `404`
   - `GET /api/videos/{id}/play` 返回 `404`
   - `GET /api/my/videos` 中不再出现该视频
+- 视频播放加分项采用 HTTP Range 落地，思路与“服务端流式响应/大规模数据传输/视频流”一致，但这里不是 gRPC
+- 当前实现不包含应用层限流；后续如需保护播放流量，可再结合令牌桶或并发控制
 
 ## 常见问题
 

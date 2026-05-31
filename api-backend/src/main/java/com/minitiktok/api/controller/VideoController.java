@@ -8,6 +8,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.minitiktok.api.entity.Video;
 import com.minitiktok.api.exception.ForbiddenVideoOperationException;
 import com.minitiktok.api.exception.VideoNotFoundException;
+import java.io.IOException;
 import java.util.List;
 import com.minitiktok.api.security.CurrentUserService;
 import com.minitiktok.api.service.VideoService;
@@ -16,8 +17,9 @@ import com.minitiktok.api.storage.VideoStorageService;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.Resource;
-import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -44,13 +46,11 @@ public class VideoController {
     }
 
     @GetMapping("/api/videos/{id}/play")
-    public org.springframework.http.ResponseEntity<Resource> playVideo(@PathVariable("id") Long id) {
+    public ResponseEntity<Resource> playVideo(@PathVariable("id") Long id) {
         return videoService.findActiveById(id)
                 .flatMap(video -> videoStorageService.loadAsResource(video.getFileHash()))
-                .map(resource -> org.springframework.http.ResponseEntity.ok()
-                        .contentType(MediaType.valueOf("video/mp4"))
-                        .body(resource))
-                .orElseGet(() -> org.springframework.http.ResponseEntity.notFound().build());
+                .map(this::buildPlayResponse)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @PostMapping("/api/videos")
@@ -138,6 +138,19 @@ public class VideoController {
                 video.getTitle(),
                 "/api/videos/" + video.getId() + "/play",
                 video.getCreatedAt());
+    }
+
+    private ResponseEntity<Resource> buildPlayResponse(Resource resource) {
+        try {
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+                    .header("X-Content-Type-Options", "nosniff")
+                    .contentType(MediaType.valueOf("video/mp4"))
+                    .contentLength(resource.contentLength())
+                    .body(resource);
+        } catch (IOException ex) {
+            throw new IllegalStateException("Failed to read video resource metadata", ex);
+        }
     }
 
     private void validatePagination(long page, long size) {
