@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 
 import {
   authErrorMessage,
+  buildLogoutUrl,
   buildAuthorizationUrl,
   exchangeCodeForToken,
   fetchCurrentUser,
@@ -100,11 +101,14 @@ export const useAuthStore = defineStore('auth', {
         this.loading = false
       }
     },
-    logout(): void {
+    logout(options?: { redirectToAuthServer?: boolean }): void {
       clearAuthStorage()
       this.accessToken = null
       this.user = null
       this.error = null
+      if (options?.redirectToAuthServer) {
+        window.location.assign(buildLogoutUrl())
+      }
     },
   },
 })

@@ -77,14 +77,12 @@
 
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { VideoItem } from '../api/types'
 import { useVideoStore } from '../stores/video'
 import { useDisplayUser } from '../composables/useDisplayUser'
 
-const router = useRouter()
 const videoStore = useVideoStore()
 const { displayUser, isAuthenticated, authStore } = useDisplayUser()
 const { myVideos, myVideosHasMore, myVideosPage, myVideosSize, loading, errorMessage } =
@@ -137,9 +135,8 @@ async function remove() {
 }
 
 function onLogout() {
-  authStore.logout()
+  authStore.logout({ redirectToAuthServer: true })
   ElMessage('已退出登录')
-  router.push('/')
 }
 
 function onLogin() {
