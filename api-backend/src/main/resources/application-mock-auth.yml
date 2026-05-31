@@ -1,0 +1,10 @@
+video:
+  temp-dir: storage/uploads
+
+mock-auth:
+  enabled: true
+  tokens:
+    video-write: mock-video-write
+    video-read: mock-video-read
+    video-like: mock-video-like
+    all: mock-all

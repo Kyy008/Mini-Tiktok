@@ -7,3 +7,4 @@ frontend/node_modules/
 
 # Local test runner overrides
 auth-backend/src/test/resources/mockito-extensions/
+.trae/

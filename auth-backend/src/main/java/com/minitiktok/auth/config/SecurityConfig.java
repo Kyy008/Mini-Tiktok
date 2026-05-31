@@ -1,7 +1,6 @@
 package com.minitiktok.auth.config;
 
 import java.io.IOException;
-import java.util.Collection;
 import java.util.List;
 
 import jakarta.servlet.FilterChain;
@@ -12,24 +11,17 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
-import org.springframework.core.convert.converter.Converter;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
-import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.authentication.AuthenticationTrustResolver;
 import org.springframework.security.authentication.AuthenticationTrustResolverImpl;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.authorization.config.annotation.web.configurers.OAuth2AuthorizationServerConfigurer;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
-import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.DefaultRedirectStrategy;
 import org.springframework.security.web.RedirectStrategy;
 import org.springframework.security.web.SecurityFilterChain;
@@ -74,30 +66,8 @@ public class SecurityConfig {
 
     @Bean
     @Order(2)
-    SecurityFilterChain thirdPartyResourceSecurityFilterChain(
-            HttpSecurity http,
-            Converter<Jwt, ? extends AbstractAuthenticationToken> jwtAuthenticationConverter) throws Exception {
-        http
-                .securityMatcher("/third-party/resources/**")
-                .cors(Customizer.withDefaults())
-                .csrf(AbstractHttpConfigurer::disable)
-                .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/third-party/resources/me").hasAuthority("SCOPE_video:read")
-                        .requestMatchers(HttpMethod.GET, "/third-party/resources/videos").hasAuthority("SCOPE_video:read")
-                        .requestMatchers(HttpMethod.POST, "/third-party/resources/videos").hasAuthority("SCOPE_video:write")
-                        .anyRequest().authenticated())
-                .oauth2ResourceServer(oauth2 -> oauth2
-                        .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)));
-
-        return http.build();
-    }
-
-    @Bean
-    @Order(3)
     SecurityFilterChain applicationSecurityFilterChain(
             HttpSecurity http,
-            Converter<Jwt, ? extends AbstractAuthenticationToken> jwtAuthenticationConverter,
             RequestCache requestCache,
             @Value("${app.frontend.base-url:http://localhost:5173}") String frontendBaseUrl) throws Exception {
         http
@@ -120,24 +90,9 @@ public class SecurityConfig {
                         .clearAuthentication(true)
                         .invalidateHttpSession(true)
                         .deleteCookies("JSESSIONID")
-                        .permitAll())
-                .oauth2ResourceServer(oauth2 -> oauth2
-                        .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)));
+                        .permitAll());
 
         return http.build();
-    }
-
-    @Bean
-    Converter<Jwt, ? extends AbstractAuthenticationToken> jwtAuthenticationConverter() {
-        JwtGrantedAuthoritiesConverter grantedAuthoritiesConverter = new JwtGrantedAuthoritiesConverter();
-        grantedAuthoritiesConverter.setAuthorityPrefix("SCOPE_");
-        grantedAuthoritiesConverter.setAuthoritiesClaimName("scope");
-
-        JwtAuthenticationConverter authenticationConverter = new JwtAuthenticationConverter();
-        authenticationConverter.setJwtGrantedAuthoritiesConverter(
-                jwt -> (Collection<GrantedAuthority>) grantedAuthoritiesConverter.convert(jwt));
-        authenticationConverter.setPrincipalClaimName("sub");
-        return authenticationConverter;
     }
 
     @Bean

@@ -67,7 +67,7 @@ export const useAuthStore = defineStore('auth', {
         saveAccessToken(token.access_token)
         this.accessToken = token.access_token
 
-        const user = await fetchCurrentUser()
+        const user = normalizeCurrentUser(await fetchCurrentUser())
         saveCurrentUser(user)
         this.user = user
         clearPkce()
@@ -91,7 +91,7 @@ export const useAuthStore = defineStore('auth', {
       this.loading = true
       this.accessToken = accessToken
       try {
-        const user = await fetchCurrentUser()
+        const user = normalizeCurrentUser(await fetchCurrentUser())
         this.user = user
         saveCurrentUser(user)
       } catch {
@@ -108,3 +108,16 @@ export const useAuthStore = defineStore('auth', {
     },
   },
 })
+
+function normalizeCurrentUser(user: CurrentUser): CurrentUser {
+  const numericId = Number(user.userId)
+  return {
+    ...user,
+    id: Number.isFinite(numericId) ? numericId : 0,
+    username: user.username || user.userId,
+    avatar:
+      user.avatar ||
+      `https://picsum.photos/seed/${encodeURIComponent(user.userId)}/120/120`,
+    signature: user.signature || '这个人很懒，什么都没写~',
+  }
+}
