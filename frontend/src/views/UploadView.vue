@@ -69,15 +69,18 @@ function onPick(e: Event) {
   previewUrl.value = URL.createObjectURL(f)
 }
 
-function submit() {
+async function submit() {
   if (!canSubmit.value || !file.value) return
   submitting.value = true
-  setTimeout(() => {
-    videoStore.publish(title.value.trim(), file.value!)
-    submitting.value = false
+  try {
+    await videoStore.publish(title.value.trim(), file.value)
     ElMessage.success('发布成功')
     router.push('/my/videos')
-  }, 600)
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '发布失败')
+  } finally {
+    submitting.value = false
+  }
 }
 </script>
 
