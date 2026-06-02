@@ -119,6 +119,23 @@ export async function getVideoPlayObjectUrl(id: number): Promise<string> {
   return URL.createObjectURL(response.data)
 }
 
+export function isApiVideoPlayUrl(path: string): boolean {
+  try {
+    const url = new URL(path, API_BASE_URL)
+    const apiUrl = new URL(API_BASE_URL)
+    return url.origin === apiUrl.origin && /^\/api\/videos\/\d+\/play$/.test(url.pathname)
+  } catch {
+    return false
+  }
+}
+
+export async function resolveVideoPlaySource(video: Pick<VideoItem, 'id' | 'playUrl'>): Promise<string> {
+  if (!isApiVideoPlayUrl(video.playUrl)) {
+    return video.playUrl
+  }
+  return getVideoPlayObjectUrl(video.id)
+}
+
 function toVideoItem(video: BackendVideoPayload): VideoItem {
   const uploaderId = video.uploaderId || ''
   const resolvedAuthorId = Number(video.author?.id ?? video.author?.userId ?? uploaderId)

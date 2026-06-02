@@ -62,16 +62,16 @@
     </div>
 
     <transition name="fade">
-      <div v-if="current" class="player" @click="current = null">
+      <div v-if="current" class="player" @click="closePlayer">
         <video
           class="full"
-          :src="current.playUrl"
+          :src="currentPlaySource"
           :poster="current.coverUrl"
           autoplay
           loop
           playsinline
         />
-        <button class="close" @click.stop="current = null">×</button>
+        <button class="close" @click.stop="closePlayer">×</button>
         <button class="del" :disabled="deleting" @click.stop="remove">
           {{ deleting ? '删除中...' : '删除作品' }}
         </button>
@@ -82,10 +82,11 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { VideoItem } from '../api/types'
+import { isApiVideoPlayUrl, resolveVideoPlaySource } from '../api/video'
 import { useVideoStore } from '../stores/video'
 import { useDisplayUser } from '../composables/useDisplayUser'
 
@@ -95,10 +96,39 @@ const { myVideos, myVideosHasMore, myVideosPage, myVideosSize, loading, errorMes
   storeToRefs(videoStore)
 
 const current = ref<VideoItem | null>(null)
+const currentPlaySource = ref('')
 const deleting = ref(false)
+let currentObjectUrl: string | null = null
 
-function play(v: VideoItem) {
+async function play(v: VideoItem) {
   current.value = v
+  currentPlaySource.value = v.playUrl
+  revokeCurrentObjectUrl()
+  if (!isApiVideoPlayUrl(v.playUrl)) {
+    return
+  }
+  try {
+    const source = await resolveVideoPlaySource(v)
+    currentPlaySource.value = source
+    if (source.startsWith('blob:')) {
+      currentObjectUrl = source
+    }
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '视频加载失败')
+  }
+}
+
+function closePlayer() {
+  current.value = null
+  currentPlaySource.value = ''
+  revokeCurrentObjectUrl()
+}
+
+function revokeCurrentObjectUrl() {
+  if (currentObjectUrl) {
+    URL.revokeObjectURL(currentObjectUrl)
+    currentObjectUrl = null
+  }
 }
 
 async function loadVideos() {
@@ -129,7 +159,7 @@ async function remove() {
     })
     deleting.value = true
     await videoStore.deleteVideo(current.value.id)
-    current.value = null
+    closePlayer()
     ElMessage.success('已删除')
   } catch (error) {
     if (error instanceof Error) {
@@ -162,6 +192,8 @@ watch(isAuthenticated, (value) => {
     void loadVideos()
   }
 })
+
+onBeforeUnmount(revokeCurrentObjectUrl)
 </script>
 
 <style scoped>
