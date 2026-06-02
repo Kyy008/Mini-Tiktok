@@ -3,38 +3,55 @@ import type { ApiResult, PageResult, VideoItem } from './types'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8085'
 
-interface BackendVideoDetail {
+interface BackendVideoPayload {
   id: number
   title: string
   playUrl: string
+  coverUrl?: string
   createdAt: string
-  uploaderId: string
-}
-
-interface BackendUploadVideoResponse {
-  id: number
-  title: string
-  playUrl: string
-  createdAt: string
+  uploaderId?: string
+  author?: {
+    id?: number
+    userId?: string
+    username?: string
+    avatar?: string
+    signature?: string
+  }
+  likeCount?: number
+  commentCount?: number
+  favoriteCount?: number
+  shareCount?: number
+  liked?: boolean
+  music?: string
 }
 
 interface BackendMyVideosPageResponse {
-  records: BackendMyVideoItem[]
+  records: BackendVideoPayload[]
   page: number
   size: number
   total: number
 }
 
-interface BackendMyVideoItem {
-  id: number
-  title: string
-  playUrl: string
-  createdAt: string
+interface BackendLikeStatus {
+  liked?: boolean
+  likeCount?: number
+  count?: number
 }
 
 export async function getVideo(id: number): Promise<VideoItem> {
-  const response = await apiHttp.get<ApiResult<BackendVideoDetail>>(`/api/videos/${id}`)
+  const response = await apiHttp.get<ApiResult<BackendVideoPayload>>(`/api/videos/${id}`)
   return toVideoItem(unwrapResult(response.data))
+}
+
+export async function getRecommendations(size = 10): Promise<VideoItem[]> {
+  const response = await apiHttp.get<
+    ApiResult<BackendVideoPayload[] | { records?: BackendVideoPayload[]; list?: BackendVideoPayload[] }>
+  >('/api/videos/recommendations', {
+    params: { size },
+  })
+  const data = unwrapResult(response.data)
+  const records = Array.isArray(data) ? data : data.records ?? data.list ?? []
+  return records.map(toVideoItem)
 }
 
 export async function uploadVideo(file: File, title: string): Promise<VideoItem> {
@@ -42,7 +59,7 @@ export async function uploadVideo(file: File, title: string): Promise<VideoItem>
   form.append('file', file)
   form.append('title', title)
 
-  const response = await apiHttp.post<ApiResult<BackendUploadVideoResponse>>('/api/videos', form)
+  const response = await apiHttp.post<ApiResult<BackendVideoPayload>>('/api/videos', form)
   return toVideoItem(unwrapResult(response.data))
 }
 
@@ -65,6 +82,29 @@ export async function deleteVideo(id: number): Promise<void> {
   ensureSuccess(response.data)
 }
 
+export async function markVideoViewed(id: number): Promise<void> {
+  const response = await apiHttp.post<ApiResult<void>>(`/api/videos/${id}/views`)
+  ensureSuccess(response.data)
+}
+
+export async function likeVideo(id: number): Promise<BackendLikeStatus | null> {
+  const response = await apiHttp.post<ApiResult<BackendLikeStatus | null>>(`/api/videos/${id}/likes`)
+  ensureSuccess(response.data)
+  return response.data.data ?? null
+}
+
+export async function unlikeVideo(id: number): Promise<BackendLikeStatus | null> {
+  const response = await apiHttp.delete<ApiResult<BackendLikeStatus | null>>(`/api/videos/${id}/likes`)
+  ensureSuccess(response.data)
+  return response.data.data ?? null
+}
+
+export async function getVideoLikeStatus(id: number): Promise<BackendLikeStatus | null> {
+  const response = await apiHttp.get<ApiResult<BackendLikeStatus | null>>(`/api/videos/${id}/likes`)
+  ensureSuccess(response.data)
+  return response.data.data ?? null
+}
+
 export function getVideoPlayUrl(path: string): string {
   if (/^https?:\/\//.test(path)) {
     return path
@@ -79,25 +119,26 @@ export async function getVideoPlayObjectUrl(id: number): Promise<string> {
   return URL.createObjectURL(response.data)
 }
 
-function toVideoItem(video: BackendVideoDetail | BackendUploadVideoResponse | BackendMyVideoItem): VideoItem {
-  const uploaderId = 'uploaderId' in video ? video.uploaderId : ''
-  const authorId = Number(uploaderId)
+function toVideoItem(video: BackendVideoPayload): VideoItem {
+  const uploaderId = video.uploaderId || ''
+  const resolvedAuthorId = Number(video.author?.id ?? video.author?.userId ?? uploaderId)
   return {
     id: Number(video.id),
     title: video.title,
     playUrl: getVideoPlayUrl(video.playUrl),
-    coverUrl: `https://picsum.photos/seed/video-${video.id}/375/680`,
+    coverUrl: video.coverUrl || `https://picsum.photos/seed/video-${video.id}/375/680`,
     author: {
-      id: Number.isFinite(authorId) ? authorId : 0,
-      username: uploaderId ? `user_${uploaderId}` : '我',
-      avatar: `https://picsum.photos/seed/user-${uploaderId || 'me'}/120/120`,
+      id: Number.isFinite(resolvedAuthorId) ? resolvedAuthorId : 0,
+      username: video.author?.username || (uploaderId ? `user_${uploaderId}` : '我'),
+      avatar: video.author?.avatar || `https://picsum.photos/seed/user-${uploaderId || 'me'}/120/120`,
+      signature: video.author?.signature,
     },
-    likeCount: 0,
-    commentCount: 0,
-    favoriteCount: 0,
-    shareCount: 0,
-    liked: false,
-    music: '@原声 - Mini Tiktok',
+    likeCount: video.likeCount ?? 0,
+    commentCount: video.commentCount ?? 0,
+    favoriteCount: video.favoriteCount ?? 0,
+    shareCount: video.shareCount ?? 0,
+    liked: video.liked ?? false,
+    music: video.music || '@原声 - Mini Tiktok',
     createdAt: video.createdAt,
   }
 }

@@ -22,7 +22,7 @@
         <VideoCard
           :video="v"
           :active="i === activeIndex"
-          @like="videoStore.toggleLike(v.id)"
+          @like="onLike(v.id)"
           @comment="openComments(v.id)"
         />
       </div>
@@ -37,7 +37,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount, ref } from 'vue'
+import { nextTick, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import VideoCard from '../components/VideoCard.vue'
 import CommentSheet from '../components/CommentSheet.vue'
@@ -61,7 +61,12 @@ function openComments(id: number) {
   sheetOpen.value = true
 }
 
-onMounted(() => {
+function onLike(id: number) {
+  void videoStore.toggleLike(id)
+}
+
+function setupObserver() {
+  observer?.disconnect()
   observer = new IntersectionObserver(
     (entries) => {
       for (const e of entries) {
@@ -75,7 +80,23 @@ onMounted(() => {
   scroller.value
     ?.querySelectorAll('.slide')
     .forEach((el) => observer!.observe(el))
+}
+
+function markActiveViewed() {
+  const video = feed.value[activeIndex.value]
+  if (video) {
+    void videoStore.markViewed(video.id)
+  }
+}
+
+onMounted(async () => {
+  await videoStore.loadRecommendations()
+  await nextTick()
+  setupObserver()
+  markActiveViewed()
 })
+
+watch(activeIndex, markActiveViewed)
 
 onBeforeUnmount(() => observer?.disconnect())
 </script>
