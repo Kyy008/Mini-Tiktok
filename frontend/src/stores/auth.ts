@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import {
   authErrorMessage,
   buildLogoutUrl,
+  buildRegisterUrl,
   buildAuthorizationUrl,
   exchangeCodeForToken,
   fetchCurrentUser,
@@ -51,6 +52,9 @@ export const useAuthStore = defineStore('auth', {
           state: pkce.state,
         }),
       )
+    },
+    register(): void {
+      window.location.assign(buildRegisterUrl())
     },
     async handleCallback(code: string, state: string): Promise<CurrentUser> {
       this.loading = true

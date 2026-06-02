@@ -4,7 +4,10 @@
       <header class="cover">
         <div class="cover-actions">
           <button v-if="isAuthenticated" class="ghost" @click="onLogout">退出登录</button>
-          <button v-else class="ghost primary" @click="onLogin">登录 / 注册</button>
+          <template v-else>
+            <button class="ghost primary" @click="onLogin">登录</button>
+            <button class="ghost" @click="onRegister">注册</button>
+          </template>
         </div>
         <div class="user">
           <img class="avatar" :src="displayUser.avatar" alt="" />
@@ -29,7 +32,10 @@
 
       <div v-if="!isAuthenticated" class="empty action-empty">
         登录后查看和管理你的作品
-        <button class="login-inline" type="button" @click="onLogin">登录 / 注册</button>
+        <div class="empty-actions">
+          <button class="login-inline" type="button" @click="onLogin">登录</button>
+          <button class="login-inline secondary" type="button" @click="onRegister">注册</button>
+        </div>
       </div>
       <div v-else-if="loading" class="empty">正在加载作品...</div>
       <div v-else-if="errorMessage" class="empty action-empty">
@@ -141,6 +147,10 @@ function onLogout() {
 
 function onLogin() {
   void authStore.login()
+}
+
+function onRegister() {
+  authStore.register()
 }
 
 onMounted(() => {
