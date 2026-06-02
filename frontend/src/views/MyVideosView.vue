@@ -10,17 +10,18 @@
           </template>
         </div>
         <div class="user">
-          <img class="avatar" :src="displayUser.avatar" alt="" />
+          <div v-if="!isAuthenticated" class="avatar guest-avatar" aria-label="未登录头像"></div>
+          <img v-else class="avatar" :src="displayUser.avatar" alt="" />
           <div class="meta">
-            <div class="name">{{ displayUser.username }}</div>
-            <div class="uid">抖音号：mini_{{ displayUser.id }}</div>
+            <div class="name">{{ profileName }}</div>
+            <div class="uid">{{ profileUid }}</div>
           </div>
         </div>
-        <div class="sign">{{ displayUser.signature }}</div>
+        <div class="sign">{{ profileSign }}</div>
         <div class="stats">
-          <div><b>56</b><span>关注</span></div>
-          <div><b>1.2w</b><span>粉丝</span></div>
-          <div><b>3.4w</b><span>获赞</span></div>
+          <div><b>{{ profileStats.following }}</b><span>关注</span></div>
+          <div><b>{{ profileStats.followers }}</b><span>粉丝</span></div>
+          <div><b>{{ profileStats.likes }}</b><span>获赞</span></div>
         </div>
       </header>
 
@@ -82,8 +83,9 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { VideoItem } from '../api/types'
 import { isApiVideoPlayUrl, resolveVideoPlaySource } from '../api/video'
@@ -91,6 +93,7 @@ import { useVideoStore } from '../stores/video'
 import { useDisplayUser } from '../composables/useDisplayUser'
 
 const videoStore = useVideoStore()
+const router = useRouter()
 const { displayUser, isAuthenticated, authStore } = useDisplayUser()
 const { myVideos, myVideosHasMore, myVideosPage, myVideosSize, loading, errorMessage } =
   storeToRefs(videoStore)
@@ -99,6 +102,21 @@ const current = ref<VideoItem | null>(null)
 const currentPlaySource = ref('')
 const deleting = ref(false)
 let currentObjectUrl: string | null = null
+
+const profileName = computed(() =>
+  isAuthenticated.value ? displayUser.value.username : '未登录',
+)
+const profileUid = computed(() =>
+  isAuthenticated.value ? `抖音号：mini_${displayUser.value.id}` : '登录后显示抖音号',
+)
+const profileSign = computed(() =>
+  isAuthenticated.value ? displayUser.value.signature : '登录后查看和管理你的作品',
+)
+const profileStats = computed(() =>
+  isAuthenticated.value
+    ? { following: '56', followers: '1.2w', likes: '3.4w' }
+    : { following: '0', followers: '0', likes: '0' },
+)
 
 async function play(v: VideoItem) {
   current.value = v
@@ -176,11 +194,11 @@ function onLogout() {
 }
 
 function onLogin() {
-  void authStore.login()
+  router.push('/login')
 }
 
 function onRegister() {
-  authStore.register()
+  router.push('/register')
 }
 
 onMounted(() => {
@@ -245,6 +263,11 @@ onBeforeUnmount(revokeCurrentObjectUrl)
   border-radius: 50%;
   object-fit: cover;
   border: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.guest-avatar {
+  background: #050505;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
 }
 
 .name {

@@ -2,11 +2,12 @@ import { defineStore } from 'pinia'
 
 import {
   authErrorMessage,
-  buildLogoutUrl,
-  buildRegisterUrl,
   buildAuthorizationUrl,
+  buildLogoutUrl,
   exchangeCodeForToken,
   fetchCurrentUser,
+  loginWithPassword,
+  registerWithPassword,
 } from '../api/auth'
 import type { CurrentUser } from '../api/types'
 import { createPkceParams } from '../utils/pkce'
@@ -26,6 +27,11 @@ interface AuthState {
   user: CurrentUser | null
   loading: boolean
   error: string | null
+}
+
+interface PasswordPayload {
+  username: string
+  password: string
 }
 
 export const useAuthStore = defineStore('auth', {
@@ -53,8 +59,33 @@ export const useAuthStore = defineStore('auth', {
         }),
       )
     },
+    async submitLogin(payload: PasswordPayload): Promise<void> {
+      this.loading = true
+      this.error = null
+      try {
+        await loginWithPassword(payload)
+        await this.login()
+      } catch (error) {
+        this.error = authErrorMessage(error)
+        throw new Error(this.error)
+      } finally {
+        this.loading = false
+      }
+    },
+    async submitRegister(payload: PasswordPayload): Promise<void> {
+      this.loading = true
+      this.error = null
+      try {
+        await registerWithPassword(payload)
+      } catch (error) {
+        this.error = authErrorMessage(error)
+        throw new Error(this.error)
+      } finally {
+        this.loading = false
+      }
+    },
     register(): void {
-      window.location.assign(buildRegisterUrl())
+      window.location.assign('/register')
     },
     async handleCallback(code: string, state: string): Promise<CurrentUser> {
       this.loading = true

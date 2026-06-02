@@ -3,6 +3,8 @@ import RecommendView from '../views/RecommendView.vue'
 import OAuthCallbackView from '../views/OAuthCallbackView.vue'
 import UploadView from '../views/UploadView.vue'
 import MyVideosView from '../views/MyVideosView.vue'
+import AuthLoginView from '../views/AuthLoginView.vue'
+import AuthRegisterView from '../views/AuthRegisterView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -16,6 +18,18 @@ const router = createRouter({
       path: '/oauth/callback',
       name: 'oauth-callback',
       component: OAuthCallbackView,
+      meta: { hideTab: true },
+    },
+    {
+      path: '/login',
+      name: 'login',
+      component: AuthLoginView,
+      meta: { hideTab: true },
+    },
+    {
+      path: '/register',
+      name: 'register',
+      component: AuthRegisterView,
       meta: { hideTab: true },
     },
     {
