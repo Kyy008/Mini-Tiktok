@@ -8,6 +8,7 @@ import com.minitiktok.api.mapper.VideoViewMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 
 @Service
@@ -18,6 +19,7 @@ public class InteractionService {
     private final VideoViewMapper videoViewMapper;
 
     // 点赞视频 (防重复)
+    @Transactional
     public void likeVideo(String userId, Long videoId) {
         VideoLike like = VideoLike.builder()
                 .userId(userId)
@@ -32,6 +34,7 @@ public class InteractionService {
     }
 
     // 取消点赞
+    @Transactional
     public void unlikeVideo(String userId, Long videoId) {
         LambdaQueryWrapper<VideoLike> query = new LambdaQueryWrapper<VideoLike>()
                 .eq(VideoLike::getUserId, userId)
@@ -51,6 +54,7 @@ public class InteractionService {
     }
 
     // 记录访问历史 (防重复)
+    @Transactional
     public void recordView(String userId, Long videoId) {
         VideoView view = VideoView.builder()
                 .userId(userId)

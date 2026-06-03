@@ -1,29 +1,40 @@
 package com.minitiktok.api.logging;
 
 import com.minitiktok.api.entity.RequestLog;
+import com.minitiktok.api.exception.ForbiddenVideoOperationException;
+import com.minitiktok.api.exception.VideoNotFoundException;
 import com.minitiktok.api.mapper.RequestLogMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.stream.Collectors;
 
 @Aspect
 @Component
 @Slf4j
+@RequiredArgsConstructor
 public class RequestLogAspect {
 
-    @Autowired
-    private RequestLogMapper requestLogMapper;
+    private static final int MAX_LOG_TEXT_LENGTH = 2000;
+
+    private final RequestLogMapper requestLogMapper;
 
     @Around("execution(* com.minitiktok.api.controller..*.*(..))")
     public Object doAround(ProceedingJoinPoint joinPoint) throws Throwable {
@@ -47,47 +58,19 @@ public class RequestLogAspect {
             userId = SecurityContextHolder.getContext().getAuthentication().getName();
         }
 
-        // 2. 请求体防二进制脱敏
-        String requestBody;
-        if (path.contains("/upload")) {
-            requestBody = "[Multipart File Upload Summary]";
-        } else if (path.contains("/play")) {
-            requestBody = "[Video Play Request ID]";
-        } else {
-            requestBody = Arrays.toString(joinPoint.getArgs());
-            // 防止普通请求入参过长导致数据库 text 爆掉
-            if (requestBody.length() > 2000) {
-                requestBody = requestBody.substring(0, 2000) + "...(truncated)";
-            }
-        }
+        String requestBody = summarizeRequest(path, joinPoint.getArgs());
 
         Object result = null;
-        int statusCode = 200;
+        int statusCode = HttpStatus.OK.value();
         String responseBody = "";
 
         try {
             result = joinPoint.proceed();
-
-            // 3. 补全响应体处理 & 彻底防范播放接口 OOM 风险
-            if (path.contains("/play")) {
-                responseBody = "[Binary Stream Content]";
-            } else if (path.contains("/upload")) {
-                responseBody = "[Upload Success Meta Data]";
-            } else if (result != null) {
-                responseBody = result.toString();
-                if (responseBody.length() > 2000) {
-                    responseBody = responseBody.substring(0, 2000) + "...(truncated)";
-                }
-            }
-
-            // 尝试从真实 response 拿到状态码（支持动态控制器的映射）
-            if (response != null) {
-                statusCode = response.getStatus();
-            }
+            statusCode = resolveStatusCode(result, response);
+            responseBody = summarizeResponse(path, result);
         } catch (Throwable e) {
-            // 4. 异常请求耗时监控和审计状态码捕获
-            statusCode = 500;
-            responseBody = "[Exception]: " + e.getMessage();
+            statusCode = resolveExceptionStatus(e);
+            responseBody = truncate("[Exception]: " + safeMessage(e));
             throw e; // 抛回给全局异常处理器处理，但保证后续 finally 正常入库
         } finally {
             long duration = System.currentTimeMillis() - start;
@@ -116,5 +99,87 @@ public class RequestLogAspect {
                     userId, method, path, statusCode, duration);
         }
         return result;
+    }
+
+    private String summarizeRequest(String path, Object[] args) {
+        if (path.contains("/play")) {
+            return "[Video Play Request: " + summarizeScalarArgs(args) + "]";
+        }
+        if (containsMultipart(args)) {
+            return truncate(Arrays.stream(args)
+                    .map(this::summarizeArgument)
+                    .collect(Collectors.joining(", ", "[Multipart Request: ", "]")));
+        }
+        return truncate(Arrays.toString(args));
+    }
+
+    private String summarizeResponse(String path, Object result) {
+        if (path.contains("/play")) {
+            return "[Binary Stream Content]";
+        }
+        if (result == null) {
+            return "";
+        }
+        return truncate(result.toString());
+    }
+
+    private int resolveStatusCode(Object result, HttpServletResponse response) {
+        if (result instanceof ResponseEntity<?> responseEntity) {
+            return responseEntity.getStatusCode().value();
+        }
+        if (response != null) {
+            return response.getStatus();
+        }
+        return HttpStatus.OK.value();
+    }
+
+    private int resolveExceptionStatus(Throwable throwable) {
+        if (throwable instanceof VideoNotFoundException) {
+            return HttpStatus.NOT_FOUND.value();
+        }
+        if (throwable instanceof ForbiddenVideoOperationException || throwable instanceof AccessDeniedException) {
+            return HttpStatus.FORBIDDEN.value();
+        }
+        if (throwable instanceof AuthenticationException) {
+            return HttpStatus.UNAUTHORIZED.value();
+        }
+        if (throwable instanceof IllegalArgumentException) {
+            return HttpStatus.BAD_REQUEST.value();
+        }
+        if (throwable instanceof ResponseStatusException responseStatusException) {
+            return responseStatusException.getStatusCode().value();
+        }
+        return HttpStatus.INTERNAL_SERVER_ERROR.value();
+    }
+
+    private boolean containsMultipart(Object[] args) {
+        return Arrays.stream(args).anyMatch(MultipartFile.class::isInstance);
+    }
+
+    private String summarizeArgument(Object arg) {
+        if (arg instanceof MultipartFile file) {
+            return "file{name=%s, originalFilename=%s, contentType=%s, size=%d}"
+                    .formatted(file.getName(), file.getOriginalFilename(), file.getContentType(), file.getSize());
+        }
+        return String.valueOf(arg);
+    }
+
+    private String summarizeScalarArgs(Object[] args) {
+        String summary = Arrays.stream(args)
+                .filter(arg -> !(arg instanceof MultipartFile))
+                .map(String::valueOf)
+                .collect(Collectors.joining(", "));
+        return summary.isBlank() ? "no scalar arguments" : summary;
+    }
+
+    private String safeMessage(Throwable throwable) {
+        return throwable.getMessage() == null ? throwable.getClass().getSimpleName() : throwable.getMessage();
+    }
+
+    private String truncate(String value) {
+        if (value.length() <= MAX_LOG_TEXT_LENGTH) {
+            return value;
+        }
+        return value.substring(0, MAX_LOG_TEXT_LENGTH) + "...(truncated)";
     }
 }
