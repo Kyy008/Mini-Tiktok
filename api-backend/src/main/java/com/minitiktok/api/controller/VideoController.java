@@ -31,7 +31,6 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequiredArgsConstructor
 public class VideoController {
-
     private static final int MAX_TITLE_LENGTH = 128;
 
     private final CurrentUserService currentUserService;
