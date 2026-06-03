@@ -1,8 +1,10 @@
 package com.minitiktok.api.service;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
+import com.minitiktok.api.dto.VideoRecommendationVO;
 import org.springframework.stereotype.Service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -67,5 +69,9 @@ public class VideoService {
                 .eq(Video::getUploaderId, uploaderId)
                 .eq(Video::getDeleted, false);
         return videoMapper.selectCount(query) > 0;
+    }
+
+    public List<VideoRecommendationVO> getRecommendations(String userId, int size) {
+        return videoMapper.findRecommendations(userId, size);
     }
 }

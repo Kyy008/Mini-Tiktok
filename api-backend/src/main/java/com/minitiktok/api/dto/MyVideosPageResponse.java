@@ -13,6 +13,7 @@ public record MyVideosPageResponse(
             Long id,
             String title,
             String playUrl,
-            LocalDateTime createdAt) {
+            LocalDateTime createdAt,
+            Long likeCount) {
     }
 }

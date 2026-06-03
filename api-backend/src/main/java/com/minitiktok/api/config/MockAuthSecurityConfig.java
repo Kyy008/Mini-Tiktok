@@ -1,8 +1,8 @@
 package com.minitiktok.api.config;
 
 import java.util.Collection;
-import java.util.List;
 
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
@@ -26,6 +26,7 @@ import com.minitiktok.api.security.MockAuthJwtDecoder;
 
 @Configuration
 @Profile("mock-auth")
+@EnableConfigurationProperties(AppCorsProperties.class)
 public class MockAuthSecurityConfig {
 
     @Bean
@@ -41,6 +42,9 @@ public class MockAuthSecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/video-uploads/**").hasAuthority("SCOPE_video:write")
                         .requestMatchers(HttpMethod.PUT, "/api/video-uploads/**").hasAuthority("SCOPE_video:write")
                         .requestMatchers(HttpMethod.POST, "/api/video-uploads/*/complete").hasAuthority("SCOPE_video:write")
+                        .requestMatchers(HttpMethod.POST, "/api/videos/*/views").hasAuthority("SCOPE_video:read")
+                        .requestMatchers(HttpMethod.POST, "/api/videos/*/likes").hasAuthority("SCOPE_video:like")
+                        .requestMatchers(HttpMethod.DELETE, "/api/videos/*/likes").hasAuthority("SCOPE_video:like")
                         .requestMatchers(HttpMethod.GET, "/api/videos/**").hasAuthority("SCOPE_video:read")
                         .requestMatchers(HttpMethod.POST, "/api/videos").hasAuthority("SCOPE_video:write")
                         .requestMatchers(HttpMethod.DELETE, "/api/videos/*").hasAuthority("SCOPE_video:write")
@@ -70,11 +74,11 @@ public class MockAuthSecurityConfig {
     }
 
     @Bean
-    CorsConfigurationSource corsConfigurationSource() {
+    CorsConfigurationSource corsConfigurationSource(AppCorsProperties corsProperties) {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("http://localhost:5173"));
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("Content-Type", "Authorization"));
+        configuration.setAllowedOrigins(corsProperties.getAllowedOrigins());
+        configuration.setAllowedMethods(corsProperties.getAllowedMethods());
+        configuration.setAllowedHeaders(corsProperties.getAllowedHeaders());
         configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

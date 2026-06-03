@@ -2,6 +2,7 @@ package com.minitiktok.api.controller;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -160,6 +161,24 @@ class VideoUploadControllerTest {
                 .andExpect(jsonPath("$.data.nextChunkIndex").value(1))
                 .andExpect(jsonPath("$.data.uploadedBytes").value(5))
                 .andExpect(jsonPath("$.data.completed").value(false));
+    }
+
+    @Test
+    void shouldRejectChunkWhenRequestBodyExceedsMaxAllowedSize() throws Exception {
+        byte[] oversizedChunk = new byte[VideoUploadSessionService.MAX_CHUNK_SIZE_BYTES + 1];
+
+        mockMvc.perform(put("/api/video-uploads/upload123/chunks/0")
+                        .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                        .content(oversizedChunk)
+                        .with(jwt().authorities(() -> "SCOPE_video:write")
+                                .jwt(jwt -> jwt.subject("1")
+                                        .claim("preferred_username", "demo")
+                                        .claim("scope", "video:write"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value("Upload chunk size exceeds max allowed size"));
+
+        verify(videoUploadSessionService, never()).uploadChunk(any(), anyInt(), any(), any());
     }
 
     @Test

@@ -7,5 +7,7 @@ public record VideoDetailResponse(
         String title,
         String playUrl,
         LocalDateTime createdAt,
-        String uploaderId) {
+        String uploaderId,
+        Long likeCount,
+        Boolean liked) {
 }
