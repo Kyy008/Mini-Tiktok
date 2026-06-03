@@ -23,6 +23,9 @@ public class InteractionController {
     @GetMapping("/api/videos/recommendations")
     public Result<List<VideoRecommendationVO>> getRecommendations(
             @RequestParam(name = "size", defaultValue = "10") int size) {
+        if (size < 1) {
+            throw new IllegalArgumentException("Recommendation size must be greater than or equal to 1");
+        }
         if (size > 50) size = 50; // 对应方案要求的上限校验
         String userId = currentUserService.getCurrentUser().userId();
         List<VideoRecommendationVO> recommendations = videoService.getRecommendations(userId, size);
