@@ -11,6 +11,7 @@ import com.minitiktok.api.exception.VideoNotFoundException;
 import java.io.IOException;
 import java.util.List;
 import com.minitiktok.api.security.CurrentUserService;
+import com.minitiktok.api.service.InteractionService;
 import com.minitiktok.api.service.VideoService;
 import com.minitiktok.api.storage.StoredVideoFile;
 import com.minitiktok.api.storage.VideoStorageService;
@@ -36,12 +37,16 @@ public class VideoController {
     private final CurrentUserService currentUserService;
     private final VideoStorageService videoStorageService;
     private final VideoService videoService;
+    private final InteractionService interactionService;
 
     @GetMapping("/api/videos/{id}")
     public Result<VideoDetailResponse> getVideoDetail(@PathVariable("id") Long id) {
         Video video = videoService.findActiveById(id)
                 .orElseThrow(VideoNotFoundException::new);
-        return Result.success(toVideoDetailResponse(video));
+        String userId = currentUserService.getCurrentUser().userId();
+        long likeCount = interactionService.getLikeCount(id);
+        boolean liked = interactionService.isLikedByUser(userId, id);
+        return Result.success(toVideoDetailResponse(video, likeCount, liked));
     }
 
     @GetMapping("/api/videos/{id}/play")
@@ -122,13 +127,15 @@ public class VideoController {
         return normalizedTitle;
     }
 
-    private VideoDetailResponse toVideoDetailResponse(Video video) {
+    private VideoDetailResponse toVideoDetailResponse(Video video, long likeCount, boolean liked) {
         return new VideoDetailResponse(
                 video.getId(),
                 video.getTitle(),
                 "/api/videos/" + video.getId() + "/play",
                 video.getCreatedAt(),
-                video.getUploaderId());
+                video.getUploaderId(),
+                likeCount,
+                liked);
     }
 
     private MyVideosPageResponse.VideoItem toMyVideosItem(Video video) {

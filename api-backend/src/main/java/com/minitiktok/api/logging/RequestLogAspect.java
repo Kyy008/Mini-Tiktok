@@ -105,6 +105,11 @@ public class RequestLogAspect {
         if (path.contains("/play")) {
             return "[Video Play Request: " + summarizeScalarArgs(args) + "]";
         }
+        if (containsBinaryPayload(args)) {
+            return truncate(Arrays.stream(args)
+                    .map(this::summarizeArgument)
+                    .collect(Collectors.joining(", ", "[Binary Request: ", "]")));
+        }
         if (containsMultipart(args)) {
             return truncate(Arrays.stream(args)
                     .map(this::summarizeArgument)
@@ -156,10 +161,17 @@ public class RequestLogAspect {
         return Arrays.stream(args).anyMatch(MultipartFile.class::isInstance);
     }
 
+    private boolean containsBinaryPayload(Object[] args) {
+        return Arrays.stream(args).anyMatch(byte[].class::isInstance);
+    }
+
     private String summarizeArgument(Object arg) {
         if (arg instanceof MultipartFile file) {
             return "file{name=%s, originalFilename=%s, contentType=%s, size=%d}"
                     .formatted(file.getName(), file.getOriginalFilename(), file.getContentType(), file.getSize());
+        }
+        if (arg instanceof byte[] bytes) {
+            return "bytes{size=%d}".formatted(bytes.length);
         }
         return String.valueOf(arg);
     }
@@ -167,6 +179,7 @@ public class RequestLogAspect {
     private String summarizeScalarArgs(Object[] args) {
         String summary = Arrays.stream(args)
                 .filter(arg -> !(arg instanceof MultipartFile))
+                .filter(arg -> !(arg instanceof byte[]))
                 .map(String::valueOf)
                 .collect(Collectors.joining(", "));
         return summary.isBlank() ? "no scalar arguments" : summary;

@@ -19,6 +19,7 @@ import com.minitiktok.api.config.SecurityConfig;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.minitiktok.api.entity.Video;
 import com.minitiktok.api.security.CurrentUserService;
+import com.minitiktok.api.service.InteractionService;
 import com.minitiktok.api.service.VideoService;
 import com.minitiktok.api.storage.StoredVideoFile;
 import com.minitiktok.api.storage.VideoStorageService;
@@ -52,6 +53,9 @@ class VideoControllerTest {
     @MockBean
     private VideoService videoService;
 
+    @MockBean
+    private InteractionService interactionService;
+
     @Test
     void shouldReturnVideoDetailWhenUserHasVideoReadScope() throws Exception {
         when(videoService.findActiveById(1L)).thenReturn(Optional.of(Video.builder()
@@ -62,6 +66,8 @@ class VideoControllerTest {
                 .deleted(false)
                 .createdAt(LocalDateTime.of(2026, 5, 20, 12, 0))
                 .build()));
+        when(interactionService.getLikeCount(1L)).thenReturn(4L);
+        when(interactionService.isLikedByUser("1", 1L)).thenReturn(true);
 
         mockMvc.perform(get("/api/videos/1")
                         .with(jwt().authorities(() -> "SCOPE_video:read")
@@ -76,7 +82,9 @@ class VideoControllerTest {
                 .andExpect(jsonPath("$.data.title").value("Demo Video"))
                 .andExpect(jsonPath("$.data.playUrl").value("/api/videos/1/play"))
                 .andExpect(jsonPath("$.data.createdAt").value("2026-05-20T12:00:00"))
-                .andExpect(jsonPath("$.data.uploaderId").value("uploader-1"));
+                .andExpect(jsonPath("$.data.uploaderId").value("uploader-1"))
+                .andExpect(jsonPath("$.data.likeCount").value(4))
+                .andExpect(jsonPath("$.data.liked").value(true));
     }
 
     @Test

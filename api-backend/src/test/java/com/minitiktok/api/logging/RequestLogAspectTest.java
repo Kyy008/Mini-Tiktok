@@ -1,18 +1,21 @@
 package com.minitiktok.api.logging;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.minitiktok.api.dto.Result;
+import com.minitiktok.api.dto.UploadChunkResponse;
 import com.minitiktok.api.dto.UploadVideoResponse;
 import com.minitiktok.api.entity.RequestLog;
 import com.minitiktok.api.exception.VideoNotFoundException;
 import com.minitiktok.api.mapper.RequestLogMapper;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import org.aspectj.lang.ProceedingJoinPoint;
@@ -114,7 +117,27 @@ class RequestLogAspectTest {
         assertTrue(log.getRequestBody().contains("originalFilename=demo.mp4"));
         assertTrue(log.getRequestBody().contains("contentType=video/mp4"));
         assertTrue(log.getRequestBody().contains("size=13"));
-        assertTrue(!log.getRequestBody().contains("video-content"));
+        assertFalse(log.getRequestBody().contains("video-content"));
+    }
+
+    @Test
+    void shouldSummarizeByteArrayRequestWithoutChunkBytes() throws Throwable {
+        bindRequest("PUT", "/api/video-uploads/upload123/chunks/0");
+        byte[] chunkData = "chunk-content".getBytes(StandardCharsets.UTF_8);
+        ProceedingJoinPoint joinPoint = org.mockito.Mockito.mock(ProceedingJoinPoint.class);
+        when(joinPoint.getArgs()).thenReturn(new Object[] {"upload123", 0, chunkData});
+        when(joinPoint.proceed()).thenReturn(Result.success(new UploadChunkResponse(
+                "upload123",
+                1,
+                chunkData.length,
+                false)));
+
+        aspect.doAround(joinPoint);
+
+        RequestLog log = capturedLog();
+        assertTrue(log.getRequestBody().contains("upload123"));
+        assertTrue(log.getRequestBody().contains("bytes{size=13}"));
+        assertFalse(log.getRequestBody().contains("chunk-content"));
     }
 
     @Test
