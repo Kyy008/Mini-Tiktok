@@ -105,6 +105,9 @@ public class RequestLogAspect {
         if (path.contains("/play")) {
             return "[Video Play Request: " + summarizeScalarArgs(args) + "]";
         }
+        if (path.contains("/chunks/")) {
+            return "[Binary Request: " + summarizeScalarArgs(args) + "]";
+        }
         if (containsBinaryPayload(args)) {
             return truncate(Arrays.stream(args)
                     .map(this::summarizeArgument)
@@ -180,6 +183,8 @@ public class RequestLogAspect {
         String summary = Arrays.stream(args)
                 .filter(arg -> !(arg instanceof MultipartFile))
                 .filter(arg -> !(arg instanceof byte[]))
+                .filter(arg -> !(arg instanceof HttpServletRequest))
+                .filter(arg -> !(arg instanceof HttpServletResponse))
                 .map(String::valueOf)
                 .collect(Collectors.joining(", "));
         return summary.isBlank() ? "no scalar arguments" : summary;

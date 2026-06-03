@@ -5,8 +5,6 @@ import java.util.List;
 import java.util.Optional;
 
 import com.minitiktok.api.dto.VideoRecommendationVO;
-import com.minitiktok.api.entity.VideoView;
-import com.minitiktok.api.mapper.VideoViewMapper;
 import org.springframework.stereotype.Service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -21,7 +19,6 @@ import lombok.RequiredArgsConstructor;
 public class VideoService {
 
     private final VideoMapper videoMapper;
-    private final VideoViewMapper videoViewMapper;
 
     public Optional<Video> findActiveById(Long id) {
         LambdaQueryWrapper<Video> query = new LambdaQueryWrapper<Video>()
@@ -75,12 +72,6 @@ public class VideoService {
     }
 
     public List<VideoRecommendationVO> getRecommendations(String userId, int size) {
-        List<Long> viewedIds = videoViewMapper.selectList(
-                new LambdaQueryWrapper<VideoView>().eq(VideoView::getUserId, userId)
-        ).stream().map(VideoView::getVideoId).toList();
-
-        // 2. 查询推荐视频 (此处推荐使用 Mapper XML 或 @Select 注解)
-        // 逻辑：过滤 deleted=0，过滤 viewedIds，按点赞数降序
-        return videoMapper.findRecommendations(userId, viewedIds, size);
+        return videoMapper.findRecommendations(userId, size);
     }
 }

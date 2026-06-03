@@ -143,7 +143,8 @@ public class VideoController {
                 video.getId(),
                 video.getTitle(),
                 "/api/videos/" + video.getId() + "/play",
-                video.getCreatedAt());
+                video.getCreatedAt(),
+                interactionService.getLikeCount(video.getId()));
     }
 
     private ResponseEntity<Resource> buildPlayResponse(Resource resource) {

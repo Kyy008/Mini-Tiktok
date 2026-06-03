@@ -121,11 +121,11 @@ class RequestLogAspectTest {
     }
 
     @Test
-    void shouldSummarizeByteArrayRequestWithoutChunkBytes() throws Throwable {
+    void shouldSummarizeChunkUploadRequestWithoutServletRequestDetails() throws Throwable {
         bindRequest("PUT", "/api/video-uploads/upload123/chunks/0");
         byte[] chunkData = "chunk-content".getBytes(StandardCharsets.UTF_8);
         ProceedingJoinPoint joinPoint = org.mockito.Mockito.mock(ProceedingJoinPoint.class);
-        when(joinPoint.getArgs()).thenReturn(new Object[] {"upload123", 0, chunkData});
+        when(joinPoint.getArgs()).thenReturn(new Object[] {"upload123", 0, new MockHttpServletRequest()});
         when(joinPoint.proceed()).thenReturn(Result.success(new UploadChunkResponse(
                 "upload123",
                 1,
@@ -136,7 +136,7 @@ class RequestLogAspectTest {
 
         RequestLog log = capturedLog();
         assertTrue(log.getRequestBody().contains("upload123"));
-        assertTrue(log.getRequestBody().contains("bytes{size=13}"));
+        assertFalse(log.getRequestBody().contains("MockHttpServletRequest"));
         assertFalse(log.getRequestBody().contains("chunk-content"));
     }
 

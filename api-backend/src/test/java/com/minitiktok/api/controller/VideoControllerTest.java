@@ -343,6 +343,7 @@ class VideoControllerTest {
                                         .deleted(false)
                                         .createdAt(LocalDateTime.of(2026, 5, 22, 10, 0))
                                         .build())));
+        when(interactionService.getLikeCount(10L)).thenReturn(7L);
 
         mockMvc.perform(get("/api/my/videos")
                         .param("page", "2")
@@ -362,7 +363,8 @@ class VideoControllerTest {
                 .andExpect(jsonPath("$.data.records[0].id").value(10))
                 .andExpect(jsonPath("$.data.records[0].title").value("My Video"))
                 .andExpect(jsonPath("$.data.records[0].playUrl").value("/api/videos/10/play"))
-                .andExpect(jsonPath("$.data.records[0].createdAt").value("2026-05-22T10:00:00"));
+                .andExpect(jsonPath("$.data.records[0].createdAt").value("2026-05-22T10:00:00"))
+                .andExpect(jsonPath("$.data.records[0].likeCount").value(7));
     }
 
     @Test

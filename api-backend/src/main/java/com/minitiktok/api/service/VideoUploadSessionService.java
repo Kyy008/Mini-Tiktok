@@ -29,6 +29,7 @@ public class VideoUploadSessionService {
     private static final int MAX_TITLE_LENGTH = 128;
     private static final String STATUS_UPLOADING = "UPLOADING";
     private static final String STATUS_COMPLETED = "COMPLETED";
+    public static final int MAX_CHUNK_SIZE_BYTES = 10 * 1024 * 1024;
 
     private final VideoUploadSessionMapper videoUploadSessionMapper;
     private final VideoStorageService videoStorageService;
@@ -147,6 +148,10 @@ public class VideoUploadSessionService {
 
     private void validateUploadRequest(InitVideoUploadRequest request) {
         videoStorageService.validateMp4Metadata(request.fileName(), request.contentType());
+
+        if (request.chunkSize() > MAX_CHUNK_SIZE_BYTES) {
+            throw new IllegalArgumentException("Chunk size must not exceed %d bytes".formatted(MAX_CHUNK_SIZE_BYTES));
+        }
 
         long expectedTotalChunks = (request.fileSize() + request.chunkSize() - 1L) / request.chunkSize();
         if (expectedTotalChunks != request.totalChunks()) {

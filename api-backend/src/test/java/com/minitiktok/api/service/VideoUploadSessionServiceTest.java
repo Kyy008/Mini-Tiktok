@@ -126,6 +126,26 @@ class VideoUploadSessionServiceTest {
     }
 
     @Test
+    void shouldRejectInitWhenChunkSizeExceedsMaxAllowedSize() {
+        InitVideoUploadRequest request = new InitVideoUploadRequest(
+                "Demo Video",
+                "demo.mp4",
+                (long) VideoUploadSessionService.MAX_CHUNK_SIZE_BYTES + 1,
+                "video/mp4",
+                VideoUploadSessionService.MAX_CHUNK_SIZE_BYTES + 1,
+                1,
+                "hash123");
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                () -> videoUploadSessionService.initUpload(request, "uploader-1"));
+
+        assertEquals("Chunk size must not exceed %d bytes".formatted(VideoUploadSessionService.MAX_CHUNK_SIZE_BYTES),
+                exception.getMessage());
+        verify(videoUploadSessionMapper, never()).selectList(any());
+        verify(videoUploadSessionMapper, never()).insert(any(VideoUploadSession.class));
+    }
+
+    @Test
     void shouldReturnUploadStatusForOwnedSession() {
         when(videoUploadSessionMapper.selectOne(any()))
                 .thenReturn(uploadingSession("upload-1", 1, 5L));

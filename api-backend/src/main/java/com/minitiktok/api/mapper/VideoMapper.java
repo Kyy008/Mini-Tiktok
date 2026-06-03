@@ -15,7 +15,7 @@ public interface VideoMapper extends BaseMapper<Video> {
     /**
      * 使用编写在注解中的动态 SQL 实现推荐核心逻辑：
      * 1. 过滤未删除的视频 (deleted = 0)
-     * 2. 动态过滤已观看视频 (NOT IN viewedIds)
+     * 2. 使用 NOT EXISTS 过滤当前用户已观看视频
      * 3. 统计每个视频的点赞数作为排序依据
      * 4. 计算当前用户是否点赞
      * 5. 按点赞数降序、创建时间降序排序
@@ -28,16 +28,10 @@ public interface VideoMapper extends BaseMapper<Video> {
             "       CONCAT('/api/videos/', v.id, '/play') AS playUrl " +
             "FROM video v " +
             "WHERE v.deleted = 0 " +
-            "<if test='viewedIds != null and viewedIds.size() > 0'>" +
-            "  AND v.id NOT IN " +
-            "  <foreach collection='viewedIds' item='item' open='(' separator=',' close=')'>" +
-            "    #{item}" +
-            "  </foreach>" +
-            "</if>" +
+            "  AND NOT EXISTS (SELECT 1 FROM video_view vv WHERE vv.video_id = v.id AND vv.user_id = #{userId}) " +
             "ORDER BY likeCount DESC, v.created_at DESC " +
             "LIMIT #{size}" +
             "</script>")
     List<VideoRecommendationVO> findRecommendations(@Param("userId") String userId,
-                                                    @Param("viewedIds") List<Long> viewedIds,
                                                     @Param("size") int size);
 }

@@ -118,6 +118,7 @@ class MockAuthModeVideoControllerTest {
                                         .deleted(false)
                                         .createdAt(LocalDateTime.of(2026, 5, 22, 11, 0))
                                         .build())));
+        when(interactionService.getLikeCount(20L)).thenReturn(5L);
 
         mockMvc.perform(get("/api/my/videos")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer mock-video-read"))
@@ -128,7 +129,8 @@ class MockAuthModeVideoControllerTest {
                 .andExpect(jsonPath("$.data.total").value(1))
                 .andExpect(jsonPath("$.data.records[0].id").value(20))
                 .andExpect(jsonPath("$.data.records[0].title").value("Reader Video"))
-                .andExpect(jsonPath("$.data.records[0].playUrl").value("/api/videos/20/play"));
+                .andExpect(jsonPath("$.data.records[0].playUrl").value("/api/videos/20/play"))
+                .andExpect(jsonPath("$.data.records[0].likeCount").value(5));
     }
 
     @Test
@@ -144,6 +146,7 @@ class MockAuthModeVideoControllerTest {
                                         .deleted(false)
                                         .createdAt(LocalDateTime.of(2026, 5, 22, 12, 0))
                                         .build())));
+        when(interactionService.getLikeCount(21L)).thenReturn(3L);
 
         mockMvc.perform(get("/api/my/videos")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer mock-video-write"))
@@ -151,7 +154,8 @@ class MockAuthModeVideoControllerTest {
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.records[0].id").value(21))
                 .andExpect(jsonPath("$.data.records[0].title").value("Uploader Video"))
-                .andExpect(jsonPath("$.data.records[0].playUrl").value("/api/videos/21/play"));
+                .andExpect(jsonPath("$.data.records[0].playUrl").value("/api/videos/21/play"))
+                .andExpect(jsonPath("$.data.records[0].likeCount").value(3));
     }
 
     @Test
