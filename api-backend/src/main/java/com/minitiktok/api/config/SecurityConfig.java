@@ -22,6 +22,7 @@ import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
@@ -34,6 +35,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import com.minitiktok.api.security.ResourceServerUnavailableEntryPoint;
+import com.minitiktok.api.security.CookieBearerTokenResolver;
 
 @Configuration
 @Profile("!mock-auth")
@@ -41,7 +43,10 @@ import com.minitiktok.api.security.ResourceServerUnavailableEntryPoint;
 public class SecurityConfig {
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http, AuthenticationEntryPoint authenticationEntryPoint)
+    SecurityFilterChain securityFilterChain(
+            HttpSecurity http,
+            AuthenticationEntryPoint authenticationEntryPoint,
+            BearerTokenResolver bearerTokenResolver)
             throws Exception {
         http
                 .cors(Customizer.withDefaults())
@@ -62,6 +67,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/api/videos/*").hasAuthority("SCOPE_video:write")
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2
+                        .bearerTokenResolver(bearerTokenResolver)
                         .authenticationEntryPoint(authenticationEntryPoint)
                         .withObjectPostProcessor(new ObjectPostProcessor<BearerTokenAuthenticationFilter>() {
                             @Override
@@ -76,6 +82,11 @@ public class SecurityConfig {
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));
 
         return http.build();
+    }
+
+    @Bean
+    BearerTokenResolver bearerTokenResolver() {
+        return new CookieBearerTokenResolver();
     }
 
     @Bean

@@ -35,6 +35,8 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import jakarta.servlet.http.Cookie;
+
 @WebMvcTest(VideoController.class)
 @ActiveProfiles("mock-auth")
 @Import({MockAuthSecurityConfig.class, CurrentUserService.class})
@@ -93,6 +95,27 @@ class MockAuthModeVideoControllerTest {
 
         mockMvc.perform(get("/api/videos/1/play")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer mock-video-read"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType("video/mp4"))
+                .andExpect(content().bytes(videoContent));
+    }
+
+    @Test
+    void shouldStreamVideoFileWhenBearerTokenIsStoredInCookie() throws Exception {
+        byte[] videoContent = "video-binary".getBytes(StandardCharsets.UTF_8);
+        when(videoService.findActiveById(1L)).thenReturn(Optional.of(Video.builder()
+                .id(1L)
+                .title("Demo Video")
+                .fileHash("hash123")
+                .uploaderId("local-uploader")
+                .deleted(false)
+                .createdAt(LocalDateTime.of(2026, 5, 20, 12, 0))
+                .build()));
+        when(videoStorageService.loadAsResource("hash123"))
+                .thenReturn(Optional.of(new ByteArrayResource(videoContent)));
+
+        mockMvc.perform(get("/api/videos/1/play")
+                        .cookie(new Cookie("mini_tiktok_access_token", "mock-video-read")))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType("video/mp4"))
                 .andExpect(content().bytes(videoContent));

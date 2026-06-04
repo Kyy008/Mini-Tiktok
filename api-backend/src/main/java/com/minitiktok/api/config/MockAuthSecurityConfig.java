@@ -17,11 +17,13 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import com.minitiktok.api.security.CookieBearerTokenResolver;
 import com.minitiktok.api.security.MockAuthJwtDecoder;
 
 @Configuration
@@ -30,7 +32,8 @@ import com.minitiktok.api.security.MockAuthJwtDecoder;
 public class MockAuthSecurityConfig {
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain securityFilterChain(HttpSecurity http, BearerTokenResolver bearerTokenResolver)
+            throws Exception {
         http
                 .cors(Customizer.withDefaults())
                 .csrf(AbstractHttpConfigurer::disable)
@@ -50,9 +53,15 @@ public class MockAuthSecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/api/videos/*").hasAuthority("SCOPE_video:write")
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2
+                        .bearerTokenResolver(bearerTokenResolver)
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));
 
         return http.build();
+    }
+
+    @Bean
+    BearerTokenResolver bearerTokenResolver() {
+        return new CookieBearerTokenResolver();
     }
 
     @Bean

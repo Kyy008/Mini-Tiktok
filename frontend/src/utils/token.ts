@@ -1,6 +1,7 @@
 import type { CurrentUser } from '../api/types'
 
 const ACCESS_TOKEN_KEY = 'mini_tiktok_access_token'
+const ACCESS_TOKEN_COOKIE = 'mini_tiktok_access_token'
 const USER_KEY = 'mini_tiktok_user'
 const PKCE_VERIFIER_KEY = 'mini_tiktok_pkce_code_verifier'
 const PKCE_STATE_KEY = 'mini_tiktok_pkce_state'
@@ -14,6 +15,7 @@ export interface StoredPkce {
 
 export function saveAccessToken(accessToken: string): void {
   sessionStorage.setItem(ACCESS_TOKEN_KEY, accessToken)
+  writeAccessTokenCookie(accessToken)
 }
 
 export function getAccessToken(): string | null {
@@ -69,5 +71,20 @@ export function clearPkce(): void {
 export function clearAuthStorage(): void {
   sessionStorage.removeItem(ACCESS_TOKEN_KEY)
   sessionStorage.removeItem(USER_KEY)
+  clearAccessTokenCookie()
   clearPkce()
+}
+
+function writeAccessTokenCookie(accessToken: string): void {
+  if (typeof document === 'undefined') {
+    return
+  }
+  document.cookie = `${ACCESS_TOKEN_COOKIE}=${encodeURIComponent(accessToken)}; Path=/; SameSite=Lax`
+}
+
+function clearAccessTokenCookie(): void {
+  if (typeof document === 'undefined') {
+    return
+  }
+  document.cookie = `${ACCESS_TOKEN_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`
 }

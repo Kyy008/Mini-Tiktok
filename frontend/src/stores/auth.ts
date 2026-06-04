@@ -123,6 +123,7 @@ export const useAuthStore = defineStore('auth', {
 
       this.loading = true
       this.accessToken = accessToken
+      saveAccessToken(accessToken)
       try {
         const user = normalizeCurrentUser(await fetchCurrentUser())
         this.user = user
