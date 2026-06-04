@@ -32,6 +32,19 @@
         <span class="count">{{ title.length }}/55</span>
       </div>
 
+      <div v-if="uploadProgress" class="progress">
+        <div class="progress-top">
+          <span>{{ progressLabel }}</span>
+          <b>{{ uploadProgress.percent }}%</b>
+        </div>
+        <div class="progress-track">
+          <div class="progress-bar" :style="{ width: `${uploadProgress.percent}%` }" />
+        </div>
+        <div class="progress-meta">
+          分片 {{ uploadProgress.currentChunk }}/{{ uploadProgress.totalChunks }}
+        </div>
+      </div>
+
       <button class="submit" :disabled="!canSubmit" @click="submit">
         {{ submitting ? '发布中...' : '发布' }}
       </button>
@@ -41,12 +54,14 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useVideoStore } from '../stores/video'
 
 const router = useRouter()
 const videoStore = useVideoStore()
+const { uploadProgress } = storeToRefs(videoStore)
 
 const file = ref<File | null>(null)
 const previewUrl = ref('')
@@ -55,7 +70,10 @@ const submitting = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
 
 const canSubmit = computed(
-  () => !!file.value && title.value.trim().length > 0 && !submitting.value,
+  () => !!file.value && file.value.size > 0 && title.value.trim().length > 0 && !submitting.value,
+)
+const progressLabel = computed(() =>
+  uploadProgress.value?.status === 'COMPLETED' ? '合并完成' : '正在上传',
 )
 
 function onPick(e: Event) {
@@ -63,6 +81,11 @@ function onPick(e: Event) {
   if (!f) return
   if (f.type !== 'video/mp4') {
     ElMessage.error('仅支持 MP4 格式视频')
+    resetFileInput()
+    return
+  }
+  if (f.size <= 0) {
+    ElMessage.error('视频文件不能为空')
     resetFileInput()
     return
   }
@@ -197,6 +220,42 @@ onBeforeUnmount(revokePreviewUrl)
   bottom: 8px;
   font-size: 12px;
   color: rgba(255, 255, 255, 0.4);
+}
+
+.progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 10px;
+  background: #242424;
+}
+
+.progress-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 13px;
+}
+
+.progress-track {
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  border-radius: inherit;
+  background: #fe2c55;
+  transition: width 0.18s ease;
+}
+
+.progress-meta {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 12px;
 }
 
 .submit {

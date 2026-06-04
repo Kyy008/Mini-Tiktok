@@ -1,17 +1,18 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
-import type { CommentItem, PageResult, VideoItem } from '../api/types'
+import type { CommentItem, PageResult, UploadProgress, VideoItem } from '../api/types'
 import {
   deleteVideo as deleteVideoApi,
   getRecommendations as fetchRecommendations,
   getMyVideos as fetchMyVideos,
+  getVideo as fetchVideo,
+  getVideoLikeStatus,
   likeVideo as likeVideoApi,
   markVideoViewed as markVideoViewedApi,
   unlikeVideo as unlikeVideoApi,
   uploadVideo as uploadVideoApi,
 } from '../api/video'
-import { mockComments } from '../mock/data'
 
 export const useVideoStore = defineStore('video', () => {
   const feed = ref<VideoItem[]>([])
@@ -24,10 +25,16 @@ export const useVideoStore = defineStore('video', () => {
   const feedLoading = ref(false)
   const errorMessage = ref('')
   const feedErrorMessage = ref('')
+  const uploadProgress = ref<UploadProgress | null>(null)
   const viewedVideoIds = ref<Set<number>>(new Set())
 
   function findInAll(id: number): VideoItem[] {
     return [...feed.value, ...myVideos.value].filter((v) => v.id === id)
+  }
+
+  function replaceVideo(video: VideoItem): void {
+    replaceInList(feed, video)
+    replaceInList(myVideos, video)
   }
 
   async function loadRecommendations(size = 10): Promise<VideoItem[]> {
@@ -46,6 +53,23 @@ export const useVideoStore = defineStore('video', () => {
     }
   }
 
+  async function loadVideoDetail(id: number): Promise<VideoItem> {
+    const detail = await fetchVideo(id)
+    const likeStatus = await getVideoLikeStatus(id)
+    if (likeStatus) {
+      detail.liked = likeStatus.liked ?? detail.liked
+      detail.likeCount = likeStatus.likeCount ?? likeStatus.count ?? detail.likeCount
+    }
+    replaceVideo(detail)
+    return detail
+  }
+
+  async function refreshLikeStatus(id: number): Promise<void> {
+    const status = await getVideoLikeStatus(id)
+    if (!status) return
+    applyLikeState(findInAll(id), status.liked ?? false, status.likeCount ?? status.count)
+  }
+
   async function toggleLike(id: number): Promise<void> {
     const videos = findInAll(id)
     if (!videos.length) return
@@ -54,10 +78,8 @@ export const useVideoStore = defineStore('video', () => {
     applyLikeState(videos, nextLiked)
 
     try {
-      const status = nextLiked ? await likeVideoApi(id) : await unlikeVideoApi(id)
-      if (status) {
-        applyLikeState(videos, status.liked ?? nextLiked, status.likeCount ?? status.count)
-      }
+      await (nextLiked ? likeVideoApi(id) : unlikeVideoApi(id))
+      await refreshLikeStatus(id)
     } catch (error) {
       applyLikeState(videos, !nextLiked)
       throw error
@@ -74,8 +96,8 @@ export const useVideoStore = defineStore('video', () => {
     }
   }
 
-  function loadComments(id: number): CommentItem[] {
-    return mockComments(id)
+  function loadComments(_id: number): CommentItem[] {
+    return []
   }
 
   async function loadMyVideos(page = 1, size = myVideosSize.value): Promise<PageResult<VideoItem>> {
@@ -105,8 +127,11 @@ export const useVideoStore = defineStore('video', () => {
   async function publish(title: string, file: File): Promise<VideoItem> {
     loading.value = true
     errorMessage.value = ''
+    uploadProgress.value = null
     try {
-      const item = await uploadVideoApi(file, title)
+      const item = await uploadVideoApi(file, title, (progress) => {
+        uploadProgress.value = progress
+      })
       myVideos.value.unshift(item)
       myVideosTotal.value += 1
       return item
@@ -145,15 +170,25 @@ export const useVideoStore = defineStore('video', () => {
     feedLoading,
     errorMessage,
     feedErrorMessage,
+    uploadProgress,
     toggleLike,
     markViewed,
     loadComments,
     loadRecommendations,
+    loadVideoDetail,
+    refreshLikeStatus,
     loadMyVideos,
     publish,
     deleteVideo,
   }
 })
+
+function replaceInList(list: { value: VideoItem[] }, video: VideoItem): void {
+  const index = list.value.findIndex((item) => item.id === video.id)
+  if (index !== -1) {
+    list.value[index] = video
+  }
+}
 
 function applyLikeState(videos: VideoItem[], liked: boolean, explicitCount?: number): void {
   for (const video of videos) {

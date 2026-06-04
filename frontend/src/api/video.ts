@@ -1,7 +1,8 @@
 import { apiHttp } from '../utils/http'
-import type { ApiResult, PageResult, VideoItem } from './types'
+import type { ApiResult, PageResult, UploadProgress, VideoItem } from './types'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8085'
+const DEFAULT_CHUNK_SIZE = 1024 * 1024
 
 interface BackendVideoPayload {
   id: number
@@ -33,9 +34,37 @@ interface BackendMyVideosPageResponse {
 }
 
 interface BackendLikeStatus {
+  videoId?: number
   liked?: boolean
   likeCount?: number
   count?: number
+}
+
+interface InitVideoUploadRequest {
+  title: string
+  fileName: string
+  fileSize: number
+  contentType: string
+  chunkSize: number
+  totalChunks: number
+  fileHash: string
+}
+
+interface VideoUploadSessionResponse {
+  uploadId: string
+  nextChunkIndex: number
+  uploadedBytes: number
+  fileSize: number
+  chunkSize: number
+  totalChunks: number
+  status: string
+}
+
+interface UploadChunkResponse {
+  uploadId: string
+  nextChunkIndex: number
+  uploadedBytes: number
+  completed: boolean
 }
 
 export async function getVideo(id: number): Promise<VideoItem> {
@@ -54,12 +83,105 @@ export async function getRecommendations(size = 10): Promise<VideoItem[]> {
   return records.map(toVideoItem)
 }
 
-export async function uploadVideo(file: File, title: string): Promise<VideoItem> {
-  const form = new FormData()
-  form.append('file', file)
-  form.append('title', title)
+export async function uploadVideo(
+  file: File,
+  title: string,
+  onProgress?: (progress: UploadProgress) => void,
+): Promise<VideoItem> {
+  return uploadVideoInChunks(file, title, onProgress)
+}
 
-  const response = await apiHttp.post<ApiResult<BackendVideoPayload>>('/api/videos', form)
+export async function uploadVideoInChunks(
+  file: File,
+  title: string,
+  onProgress?: (progress: UploadProgress) => void,
+): Promise<VideoItem> {
+  const chunkSize = DEFAULT_CHUNK_SIZE
+  const totalChunks = Math.ceil(file.size / chunkSize)
+  const fileHash = await sha256Hex(file)
+  const session = await initVideoUpload({
+    title,
+    fileName: file.name || 'video.mp4',
+    fileSize: file.size,
+    contentType: file.type || 'video/mp4',
+    chunkSize,
+    totalChunks,
+    fileHash,
+  })
+  const status = await getVideoUploadStatus(session.uploadId)
+  emitUploadProgress(status, onProgress)
+
+  let nextChunkIndex = status.nextChunkIndex
+  while (nextChunkIndex < status.totalChunks) {
+    const start = nextChunkIndex * status.chunkSize
+    const end = Math.min(start + status.chunkSize, file.size)
+    const chunkResult = await uploadVideoChunk(
+      status.uploadId,
+      nextChunkIndex,
+      file.slice(start, end),
+    )
+    nextChunkIndex = chunkResult.nextChunkIndex
+    emitUploadProgress(
+      {
+        ...status,
+        nextChunkIndex,
+        uploadedBytes: chunkResult.uploadedBytes,
+      },
+      onProgress,
+    )
+  }
+
+  const completed = await completeVideoUpload(status.uploadId)
+  emitUploadProgress(
+    {
+      ...status,
+      nextChunkIndex: status.totalChunks,
+      uploadedBytes: status.fileSize,
+      status: 'COMPLETED',
+    },
+    onProgress,
+  )
+  return completed
+}
+
+export async function initVideoUpload(
+  payload: InitVideoUploadRequest,
+): Promise<VideoUploadSessionResponse> {
+  const response = await apiHttp.post<ApiResult<VideoUploadSessionResponse>>(
+    '/api/video-uploads/init',
+    payload,
+  )
+  return unwrapResult(response.data)
+}
+
+export async function getVideoUploadStatus(uploadId: string): Promise<VideoUploadSessionResponse> {
+  const response = await apiHttp.get<ApiResult<VideoUploadSessionResponse>>(
+    `/api/video-uploads/${uploadId}`,
+  )
+  return unwrapResult(response.data)
+}
+
+export async function uploadVideoChunk(
+  uploadId: string,
+  chunkIndex: number,
+  chunk: Blob,
+): Promise<UploadChunkResponse> {
+  const response = await apiHttp.put<ApiResult<UploadChunkResponse>>(
+    `/api/video-uploads/${uploadId}/chunks/${chunkIndex}`,
+    chunk,
+    {
+      headers: {
+        'Content-Type': 'application/octet-stream',
+      },
+    },
+  )
+  return unwrapResult(response.data)
+}
+
+export async function completeVideoUpload(uploadId: string): Promise<VideoItem> {
+  const response = await apiHttp.post<ApiResult<BackendVideoPayload>>(
+    `/api/video-uploads/${uploadId}/complete`,
+  )
   return toVideoItem(unwrapResult(response.data))
 }
 
@@ -94,7 +216,9 @@ export async function likeVideo(id: number): Promise<BackendLikeStatus | null> {
 }
 
 export async function unlikeVideo(id: number): Promise<BackendLikeStatus | null> {
-  const response = await apiHttp.delete<ApiResult<BackendLikeStatus | null>>(`/api/videos/${id}/likes`)
+  const response = await apiHttp.delete<ApiResult<BackendLikeStatus | null>>(
+    `/api/videos/${id}/likes`,
+  )
   ensureSuccess(response.data)
   return response.data.data ?? null
 }
@@ -138,6 +262,29 @@ function toVideoItem(video: BackendVideoPayload): VideoItem {
     music: video.music || '@原声 - Mini Tiktok',
     createdAt: video.createdAt,
   }
+}
+
+function emitUploadProgress(
+  session: VideoUploadSessionResponse,
+  onProgress?: (progress: UploadProgress) => void,
+): void {
+  onProgress?.({
+    uploadId: session.uploadId,
+    uploadedBytes: session.uploadedBytes,
+    fileSize: session.fileSize,
+    currentChunk: session.nextChunkIndex,
+    totalChunks: session.totalChunks,
+    percent: session.fileSize > 0 ? Math.round((session.uploadedBytes / session.fileSize) * 100) : 0,
+    status: session.status,
+  })
+}
+
+async function sha256Hex(file: File): Promise<string> {
+  const buffer = await file.arrayBuffer()
+  const digest = await crypto.subtle.digest('SHA-256', buffer)
+  return [...new Uint8Array(digest)]
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('')
 }
 
 function unwrapResult<T>(result: ApiResult<T>): T {

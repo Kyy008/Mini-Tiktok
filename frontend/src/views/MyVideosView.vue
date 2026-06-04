@@ -60,7 +60,7 @@
         >
           加载更多
         </button>
-        <div v-if="!myVideos.length" class="empty">还没有发布作品，去发一个吧~</div>
+        <div v-if="!myVideos.length" class="empty">还没有发布作品，去发一个吧</div>
       </template>
     </div>
 
@@ -74,7 +74,7 @@
           loop
           playsinline
         />
-        <button class="close" @click.stop="closePlayer">×</button>
+        <button class="close" @click.stop="closePlayer">x</button>
         <button class="del" :disabled="deleting" @click.stop="remove">
           {{ deleting ? '删除中...' : '删除作品' }}
         </button>
@@ -104,24 +104,33 @@ const current = ref<VideoItem | null>(null)
 const currentPlaySource = ref('')
 const deleting = ref(false)
 
-const profileName = computed(() =>
-  isAuthenticated.value ? displayUser.value.username : '未登录',
-)
+const profileName = computed(() => (isAuthenticated.value ? displayUser.value.username : '未登录'))
 const profileUid = computed(() =>
   isAuthenticated.value ? `抖音号：mini_${displayUser.value.id}` : '登录后显示抖音号',
 )
 const profileSign = computed(() =>
   isAuthenticated.value ? displayUser.value.signature : '登录后查看和管理你的作品',
 )
-const profileStats = computed(() =>
-  isAuthenticated.value
-    ? { following: '56', followers: '1.2w', likes: '3.4w' }
-    : { following: '0', followers: '0', likes: '0' },
-)
+const profileStats = computed(() => ({
+  following: '0',
+  followers: '0',
+  likes: isAuthenticated.value
+    ? myVideos.value.reduce((total, item) => total + item.likeCount, 0).toString()
+    : '0',
+}))
 
-function play(v: VideoItem) {
+async function play(v: VideoItem) {
   current.value = v
   currentPlaySource.value = resolveVideoPlaySource(v)
+  try {
+    const detail = await videoStore.loadVideoDetail(v.id)
+    if (current.value?.id === v.id) {
+      current.value = detail
+      currentPlaySource.value = resolveVideoPlaySource(detail)
+    }
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '加载视频详情失败')
+  }
 }
 
 function closePlayer() {
@@ -349,6 +358,15 @@ watch(isAuthenticated, (value) => {
   color: #fff;
   font-size: 13px;
   font-weight: 600;
+}
+
+.login-inline.secondary {
+  background: #333;
+}
+
+.empty-actions {
+  display: flex;
+  gap: 10px;
 }
 
 .load-more {

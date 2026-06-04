@@ -17,7 +17,14 @@
     </div>
     <div v-else-if="!feed.length" class="state">暂无推荐视频</div>
 
-    <div v-else ref="scroller" class="feed">
+    <div
+      v-else
+      ref="scroller"
+      class="feed"
+      @wheel="onWheel"
+      @touchstart.passive="onTouchStart"
+      @touchend.passive="onTouchEnd"
+    >
       <div
         v-for="(v, i) in feed"
         :key="v.id"
@@ -61,6 +68,8 @@ const sheetOpen = ref(false)
 const sheetVideoId = ref<number | null>(null)
 
 let observer: IntersectionObserver | null = null
+let touchStartY = 0
+let wheelLock = false
 
 function openComments(id: number) {
   sheetVideoId.value = id
@@ -81,9 +90,9 @@ async function reload() {
     await nextTick()
     activeIndex.value = 0
     setupObserver()
-    await markActiveViewed()
+    await syncActiveVideo()
   } catch {
-    // 错误文案已写入 feedErrorMessage。
+    // 错误文案已经写入 feedErrorMessage。
   }
 }
 
@@ -105,9 +114,14 @@ function setupObserver() {
     .forEach((el) => observer!.observe(el))
 }
 
-async function markActiveViewed() {
+async function syncActiveVideo() {
   const video = feed.value[activeIndex.value]
   if (!video) return
+  try {
+    await videoStore.loadVideoDetail(video.id)
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '加载视频详情失败')
+  }
   try {
     await videoStore.markViewed(video.id)
   } catch (error) {
@@ -115,10 +129,40 @@ async function markActiveViewed() {
   }
 }
 
+function goToIndex(index: number) {
+  const next = Math.max(0, Math.min(feed.value.length - 1, index))
+  if (next === activeIndex.value || !scroller.value) return
+  activeIndex.value = next
+  scroller.value.scrollTo({
+    top: next * scroller.value.clientHeight,
+    behavior: 'smooth',
+  })
+}
+
+function onWheel(event: WheelEvent) {
+  if (Math.abs(event.deltaY) < 20 || wheelLock) return
+  wheelLock = true
+  goToIndex(activeIndex.value + (event.deltaY > 0 ? 1 : -1))
+  window.setTimeout(() => {
+    wheelLock = false
+  }, 420)
+}
+
+function onTouchStart(event: TouchEvent) {
+  touchStartY = event.changedTouches[0]?.clientY ?? 0
+}
+
+function onTouchEnd(event: TouchEvent) {
+  const endY = event.changedTouches[0]?.clientY ?? touchStartY
+  const delta = touchStartY - endY
+  if (Math.abs(delta) < 40) return
+  goToIndex(activeIndex.value + (delta > 0 ? 1 : -1))
+}
+
 onMounted(reload)
 
 watch(activeIndex, () => {
-  void markActiveViewed()
+  void syncActiveVideo()
 })
 
 watch(
@@ -171,6 +215,7 @@ onBeforeUnmount(() => observer?.disconnect())
   overflow-y: scroll;
   scroll-snap-type: y mandatory;
   scrollbar-width: none;
+  overscroll-behavior-y: contain;
 }
 
 .feed::-webkit-scrollbar {
