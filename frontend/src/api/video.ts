@@ -106,34 +106,14 @@ export async function getVideoLikeStatus(id: number): Promise<BackendLikeStatus 
 }
 
 export function getVideoPlayUrl(path: string): string {
-  if (/^https?:\/\//.test(path)) {
+  if (/^https?:\/\//.test(path) || path.startsWith('blob:')) {
     return path
   }
   return new URL(path, API_BASE_URL).toString()
 }
 
-export async function getVideoPlayObjectUrl(id: number): Promise<string> {
-  const response = await apiHttp.get<Blob>(`/api/videos/${id}/play`, {
-    responseType: 'blob',
-  })
-  return URL.createObjectURL(response.data)
-}
-
-export function isApiVideoPlayUrl(path: string): boolean {
-  try {
-    const url = new URL(path, API_BASE_URL)
-    const apiUrl = new URL(API_BASE_URL)
-    return url.origin === apiUrl.origin && /^\/api\/videos\/\d+\/play$/.test(url.pathname)
-  } catch {
-    return false
-  }
-}
-
-export async function resolveVideoPlaySource(video: Pick<VideoItem, 'id' | 'playUrl'>): Promise<string> {
-  if (!isApiVideoPlayUrl(video.playUrl)) {
-    return video.playUrl
-  }
-  return getVideoPlayObjectUrl(video.id)
+export function resolveVideoPlaySource(video: Pick<VideoItem, 'playUrl'>): string {
+  return getVideoPlayUrl(video.playUrl)
 }
 
 function toVideoItem(video: BackendVideoPayload): VideoItem {

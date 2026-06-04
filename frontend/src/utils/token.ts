@@ -4,10 +4,12 @@ const ACCESS_TOKEN_KEY = 'mini_tiktok_access_token'
 const USER_KEY = 'mini_tiktok_user'
 const PKCE_VERIFIER_KEY = 'mini_tiktok_pkce_code_verifier'
 const PKCE_STATE_KEY = 'mini_tiktok_pkce_state'
+const PKCE_REDIRECT_KEY = 'mini_tiktok_pkce_redirect'
 
 export interface StoredPkce {
   codeVerifier: string
   state: string
+  redirectPath?: string
 }
 
 export function saveAccessToken(accessToken: string): void {
@@ -38,6 +40,11 @@ export function getCurrentUserFromStorage(): CurrentUser | null {
 export function savePkce(pkce: StoredPkce): void {
   sessionStorage.setItem(PKCE_VERIFIER_KEY, pkce.codeVerifier)
   sessionStorage.setItem(PKCE_STATE_KEY, pkce.state)
+  if (pkce.redirectPath) {
+    sessionStorage.setItem(PKCE_REDIRECT_KEY, pkce.redirectPath)
+  } else {
+    sessionStorage.removeItem(PKCE_REDIRECT_KEY)
+  }
 }
 
 export function getPkce(): StoredPkce | null {
@@ -46,12 +53,17 @@ export function getPkce(): StoredPkce | null {
   if (!codeVerifier || !state) {
     return null
   }
-  return { codeVerifier, state }
+  return {
+    codeVerifier,
+    state,
+    redirectPath: sessionStorage.getItem(PKCE_REDIRECT_KEY) || undefined,
+  }
 }
 
 export function clearPkce(): void {
   sessionStorage.removeItem(PKCE_VERIFIER_KEY)
   sessionStorage.removeItem(PKCE_STATE_KEY)
+  sessionStorage.removeItem(PKCE_REDIRECT_KEY)
 }
 
 export function clearAuthStorage(): void {

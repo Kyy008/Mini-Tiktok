@@ -4,10 +4,9 @@ import {
   authErrorMessage,
   buildAuthorizationUrl,
   buildLogoutUrl,
+  buildRegisterUrl,
   exchangeCodeForToken,
   fetchCurrentUser,
-  loginWithPassword,
-  registerWithPassword,
 } from '../api/auth'
 import type { CurrentUser } from '../api/types'
 import { createPkceParams } from '../utils/pkce'
@@ -30,8 +29,14 @@ interface AuthState {
 }
 
 interface PasswordPayload {
-  username: string
-  password: string
+  username?: string
+  password?: string
+  redirectPath?: string
+}
+
+interface CallbackResult {
+  user: CurrentUser
+  redirectPath: string
 }
 
 export const useAuthStore = defineStore('auth', {
@@ -45,12 +50,13 @@ export const useAuthStore = defineStore('auth', {
     isAuthenticated: (state) => Boolean(state.accessToken && state.user),
   },
   actions: {
-    async login() {
+    async login(options?: { redirectPath?: string }) {
       this.error = null
       const pkce = await createPkceParams()
       savePkce({
         codeVerifier: pkce.codeVerifier,
         state: pkce.state,
+        redirectPath: sanitizeRedirectPath(options?.redirectPath),
       })
       window.location.assign(
         buildAuthorizationUrl({
@@ -63,8 +69,7 @@ export const useAuthStore = defineStore('auth', {
       this.loading = true
       this.error = null
       try {
-        await loginWithPassword(payload)
-        await this.login()
+        await this.login({ redirectPath: payload.redirectPath })
       } catch (error) {
         this.error = authErrorMessage(error)
         throw new Error(this.error)
@@ -72,22 +77,13 @@ export const useAuthStore = defineStore('auth', {
         this.loading = false
       }
     },
-    async submitRegister(payload: PasswordPayload): Promise<void> {
-      this.loading = true
-      this.error = null
-      try {
-        await registerWithPassword(payload)
-      } catch (error) {
-        this.error = authErrorMessage(error)
-        throw new Error(this.error)
-      } finally {
-        this.loading = false
-      }
+    async submitRegister(_payload: PasswordPayload): Promise<void> {
+      this.register()
     },
     register(): void {
-      window.location.assign('/register')
+      window.location.assign(buildRegisterUrl())
     },
-    async handleCallback(code: string, state: string): Promise<CurrentUser> {
+    async handleCallback(code: string, state: string): Promise<CallbackResult> {
       this.loading = true
       this.error = null
       try {
@@ -99,6 +95,7 @@ export const useAuthStore = defineStore('auth', {
           throw new Error('登录状态校验失败，请重新登录')
         }
 
+        const redirectPath = sanitizeRedirectPath(pkce.redirectPath) || '/'
         const token = await exchangeCodeForToken(code, pkce.codeVerifier)
         saveAccessToken(token.access_token)
         this.accessToken = token.access_token
@@ -107,7 +104,7 @@ export const useAuthStore = defineStore('auth', {
         saveCurrentUser(user)
         this.user = user
         clearPkce()
-        return user
+        return { user, redirectPath }
       } catch (error) {
         clearAuthStorage()
         this.accessToken = null
@@ -159,4 +156,14 @@ function normalizeCurrentUser(user: CurrentUser): CurrentUser {
       `https://picsum.photos/seed/${encodeURIComponent(user.userId)}/120/120`,
     signature: user.signature || '这个人很懒，什么都没写~',
   }
+}
+
+function sanitizeRedirectPath(path?: string): string | undefined {
+  if (!path || !path.startsWith('/') || path.startsWith('//')) {
+    return undefined
+  }
+  if (path.startsWith('/login') || path.startsWith('/register') || path.startsWith('/oauth/callback')) {
+    return undefined
+  }
+  return path
 }

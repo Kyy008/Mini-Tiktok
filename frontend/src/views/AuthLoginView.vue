@@ -6,41 +6,18 @@
     </header>
 
     <main class="content">
-      <p class="eyebrow">账号登录</p>
+      <p class="eyebrow">授权登录</p>
       <h1>欢迎回来</h1>
-      <p v-if="registered" class="notice">注册成功，请登录</p>
+      <p v-if="registered" class="notice">注册成功，请继续登录</p>
       <p v-if="errorMessage" class="notice error">{{ errorMessage }}</p>
 
-      <form class="form" @submit.prevent="submit">
-        <label for="username">用户名</label>
-        <input
-          id="username"
-          v-model.trim="username"
-          autocomplete="username"
-          maxlength="32"
-          placeholder="请输入用户名"
-          required
-          type="text"
-        />
-
-        <label for="password">密码</label>
-        <input
-          id="password"
-          v-model="password"
-          autocomplete="current-password"
-          placeholder="请输入密码"
-          required
-          type="password"
-        />
-
-        <button class="primary" type="submit" :disabled="!canSubmit || loading">
-          {{ loading ? '登录中...' : '登录' }}
-        </button>
-      </form>
+      <button class="primary" type="button" :disabled="loading" @click="submit">
+        {{ loading ? '跳转中...' : '前往授权服务登录' }}
+      </button>
 
       <div class="switch">
         <span>还没有账号？</span>
-        <button type="button" @click="router.push('/register')">去注册</button>
+        <button type="button" @click="goRegister">去注册</button>
       </div>
     </main>
   </div>
@@ -58,24 +35,28 @@ const router = useRouter()
 const authStore = useAuthStore()
 const { loading } = storeToRefs(authStore)
 
-const username = ref(String(route.query.username ?? ''))
-const password = ref('')
 const errorMessage = ref('')
 
 const registered = computed(() => route.query.registered === '1')
-const canSubmit = computed(() => username.value.length > 0 && password.value.length > 0)
+const redirectPath = computed(() => firstQueryValue(route.query.redirect))
 
 async function submit() {
-  if (!canSubmit.value || loading.value) return
+  if (loading.value) return
   errorMessage.value = ''
   try {
     await authStore.submitLogin({
-      username: username.value,
-      password: password.value,
+      redirectPath: redirectPath.value,
     })
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '登录失败'
   }
+}
+
+function goRegister() {
+  router.push({
+    path: '/register',
+    query: redirectPath.value ? { redirect: redirectPath.value } : undefined,
+  })
 }
 
 function goBack() {
@@ -84,6 +65,13 @@ function goBack() {
     return
   }
   router.push('/')
+}
+
+function firstQueryValue(value: unknown): string {
+  if (Array.isArray(value)) {
+    return String(value[0] ?? '')
+  }
+  return typeof value === 'string' ? value : ''
 }
 </script>
 
@@ -148,39 +136,6 @@ h1 {
 .notice.error {
   background: rgba(254, 44, 85, 0.13);
   color: #ffb3c0;
-}
-
-.form {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-label {
-  color: rgba(255, 255, 255, 0.68);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-input {
-  width: 100%;
-  height: 48px;
-  margin-bottom: 8px;
-  padding: 0 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  outline: none;
-  background: rgba(255, 255, 255, 0.08);
-  color: #fff;
-  font: inherit;
-}
-
-input::placeholder {
-  color: rgba(255, 255, 255, 0.36);
-}
-
-input:focus {
-  border-color: rgba(37, 244, 238, 0.7);
 }
 
 .primary {

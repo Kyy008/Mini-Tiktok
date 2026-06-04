@@ -9,6 +9,7 @@
             <button class="ghost" @click="onRegister">注册</button>
           </template>
         </div>
+
         <div class="user">
           <div v-if="!isAuthenticated" class="avatar guest-avatar" aria-label="未登录头像"></div>
           <img v-else class="avatar" :src="displayUser.avatar" alt="" />
@@ -17,6 +18,7 @@
             <div class="uid">{{ profileUid }}</div>
           </div>
         </div>
+
         <div class="sign">{{ profileSign }}</div>
         <div class="stats">
           <div><b>{{ profileStats.following }}</b><span>关注</span></div>
@@ -83,12 +85,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { VideoItem } from '../api/types'
-import { isApiVideoPlayUrl, resolveVideoPlaySource } from '../api/video'
+import { resolveVideoPlaySource } from '../api/video'
 import { useVideoStore } from '../stores/video'
 import { useDisplayUser } from '../composables/useDisplayUser'
 
@@ -101,7 +103,6 @@ const { myVideos, myVideosHasMore, myVideosPage, myVideosSize, loading, errorMes
 const current = ref<VideoItem | null>(null)
 const currentPlaySource = ref('')
 const deleting = ref(false)
-let currentObjectUrl: string | null = null
 
 const profileName = computed(() =>
   isAuthenticated.value ? displayUser.value.username : '未登录',
@@ -118,35 +119,14 @@ const profileStats = computed(() =>
     : { following: '0', followers: '0', likes: '0' },
 )
 
-async function play(v: VideoItem) {
+function play(v: VideoItem) {
   current.value = v
-  currentPlaySource.value = v.playUrl
-  revokeCurrentObjectUrl()
-  if (!isApiVideoPlayUrl(v.playUrl)) {
-    return
-  }
-  try {
-    const source = await resolveVideoPlaySource(v)
-    currentPlaySource.value = source
-    if (source.startsWith('blob:')) {
-      currentObjectUrl = source
-    }
-  } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : '视频加载失败')
-  }
+  currentPlaySource.value = resolveVideoPlaySource(v)
 }
 
 function closePlayer() {
   current.value = null
   currentPlaySource.value = ''
-  revokeCurrentObjectUrl()
-}
-
-function revokeCurrentObjectUrl() {
-  if (currentObjectUrl) {
-    URL.revokeObjectURL(currentObjectUrl)
-    currentObjectUrl = null
-  }
 }
 
 async function loadVideos() {
@@ -210,8 +190,6 @@ watch(isAuthenticated, (value) => {
     void loadVideos()
   }
 })
-
-onBeforeUnmount(revokeCurrentObjectUrl)
 </script>
 
 <style scoped>
@@ -427,6 +405,7 @@ onBeforeUnmount(revokeCurrentObjectUrl)
 .fade-leave-active {
   transition: opacity 0.2s;
 }
+
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;

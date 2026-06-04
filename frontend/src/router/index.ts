@@ -5,6 +5,7 @@ import UploadView from '../views/UploadView.vue'
 import MyVideosView from '../views/MyVideosView.vue'
 import AuthLoginView from '../views/AuthLoginView.vue'
 import AuthRegisterView from '../views/AuthRegisterView.vue'
+import { getAccessToken } from '../utils/token'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -36,6 +37,7 @@ const router = createRouter({
       path: '/upload',
       name: 'upload',
       component: UploadView,
+      meta: { requiresAuth: true },
     },
     {
       path: '/my/videos',
@@ -43,6 +45,15 @@ const router = createRouter({
       component: MyVideosView,
     },
   ],
+})
+
+router.beforeEach((to) => {
+  if (to.meta.requiresAuth && !getAccessToken()) {
+    return {
+      path: '/login',
+      query: { redirect: to.fullPath },
+    }
+  }
 })
 
 export default router

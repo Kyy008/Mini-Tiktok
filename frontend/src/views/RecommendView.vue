@@ -3,16 +3,21 @@
     <header class="top-tabs">
       <span class="t">直播</span>
       <span class="t" :class="{ on: tab === 'follow' }" @click="tab = 'follow'">关注</span>
-      <span class="t" :class="{ on: tab === 'recommend' }" @click="tab = 'recommend'">
-        推荐
-      </span>
+      <span class="t" :class="{ on: tab === 'recommend' }" @click="tab = 'recommend'">推荐</span>
       <svg class="search" viewBox="0 0 24 24" width="22" height="22" fill="none">
         <circle cx="11" cy="11" r="7" stroke="#fff" stroke-width="2" />
         <path d="M20 20l-3.5-3.5" stroke="#fff" stroke-width="2" stroke-linecap="round" />
       </svg>
     </header>
 
-    <div ref="scroller" class="feed">
+    <div v-if="feedLoading" class="state">正在加载推荐...</div>
+    <div v-else-if="feedErrorMessage" class="state action-state">
+      {{ feedErrorMessage }}
+      <button type="button" @click="reload">重试</button>
+    </div>
+    <div v-else-if="!feed.length" class="state">暂无推荐视频</div>
+
+    <div v-else ref="scroller" class="feed">
       <div
         v-for="(v, i) in feed"
         :key="v.id"
@@ -37,8 +42,9 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, onBeforeUnmount, ref, watch } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
+import { ElMessage } from 'element-plus'
 import VideoCard from '../components/VideoCard.vue'
 import CommentSheet from '../components/CommentSheet.vue'
 import { useVideoStore } from '../stores/video'
@@ -46,7 +52,7 @@ import { useVideoStore } from '../stores/video'
 defineOptions({ name: 'RecommendView' })
 
 const videoStore = useVideoStore()
-const { feed } = storeToRefs(videoStore)
+const { feed, feedLoading, feedErrorMessage } = storeToRefs(videoStore)
 
 const tab = ref<'follow' | 'recommend'>('recommend')
 const scroller = ref<HTMLElement | null>(null)
@@ -61,12 +67,29 @@ function openComments(id: number) {
   sheetOpen.value = true
 }
 
-function onLike(id: number) {
-  void videoStore.toggleLike(id)
+async function onLike(id: number) {
+  try {
+    await videoStore.toggleLike(id)
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '点赞失败')
+  }
+}
+
+async function reload() {
+  try {
+    await videoStore.loadRecommendations()
+    await nextTick()
+    activeIndex.value = 0
+    setupObserver()
+    await markActiveViewed()
+  } catch {
+    // 错误文案已写入 feedErrorMessage。
+  }
 }
 
 function setupObserver() {
   observer?.disconnect()
+  if (!scroller.value) return
   observer = new IntersectionObserver(
     (entries) => {
       for (const e of entries) {
@@ -78,25 +101,33 @@ function setupObserver() {
     { root: scroller.value, threshold: [0.6] },
   )
   scroller.value
-    ?.querySelectorAll('.slide')
+    .querySelectorAll('.slide')
     .forEach((el) => observer!.observe(el))
 }
 
-function markActiveViewed() {
+async function markActiveViewed() {
   const video = feed.value[activeIndex.value]
-  if (video) {
-    void videoStore.markViewed(video.id)
+  if (!video) return
+  try {
+    await videoStore.markViewed(video.id)
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '访问记录上报失败')
   }
 }
 
-onMounted(async () => {
-  await videoStore.loadRecommendations()
-  await nextTick()
-  setupObserver()
-  markActiveViewed()
+onMounted(reload)
+
+watch(activeIndex, () => {
+  void markActiveViewed()
 })
 
-watch(activeIndex, markActiveViewed)
+watch(
+  () => feed.value.length,
+  async () => {
+    await nextTick()
+    setupObserver()
+  },
+)
 
 onBeforeUnmount(() => observer?.disconnect())
 </script>
@@ -150,5 +181,32 @@ onBeforeUnmount(() => observer?.disconnect())
   height: 100%;
   scroll-snap-align: start;
   scroll-snap-stop: always;
+}
+
+.state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 28px;
+  color: rgba(255, 255, 255, 0.55);
+  text-align: center;
+  font-size: 14px;
+}
+
+.action-state {
+  flex-direction: column;
+  gap: 14px;
+}
+
+.action-state button {
+  height: 34px;
+  padding: 0 18px;
+  border-radius: 17px;
+  background: #fe2c55;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
 }
 </style>

@@ -36,9 +36,9 @@ onMounted(async () => {
       throw new Error('缺少授权回调参数')
     }
 
-    await authStore.handleCallback(code, state)
-    statusMessage.value = '登录成功，正在返回首页...'
-    await router.replace('/')
+    const result = await authStore.handleCallback(code, state)
+    statusMessage.value = '登录成功，正在返回...'
+    await router.replace(result.redirectPath)
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '登录失败'
   }

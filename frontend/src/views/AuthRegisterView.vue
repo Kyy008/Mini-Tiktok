@@ -10,46 +10,13 @@
       <h1>创建你的账号</h1>
       <p v-if="errorMessage" class="notice error">{{ errorMessage }}</p>
 
-      <form class="form" @submit.prevent="submit">
-        <label for="username">用户名</label>
-        <input
-          id="username"
-          v-model.trim="username"
-          autocomplete="username"
-          maxlength="32"
-          placeholder="请输入用户名"
-          required
-          type="text"
-        />
-
-        <label for="password">密码</label>
-        <input
-          id="password"
-          v-model="password"
-          autocomplete="new-password"
-          placeholder="请输入密码"
-          required
-          type="password"
-        />
-
-        <label for="confirm-password">确认密码</label>
-        <input
-          id="confirm-password"
-          v-model="confirmPassword"
-          autocomplete="new-password"
-          placeholder="请再次输入密码"
-          required
-          type="password"
-        />
-
-        <button class="primary" type="submit" :disabled="!canSubmit || loading">
-          {{ loading ? '注册中...' : '注册' }}
-        </button>
-      </form>
+      <button class="primary" type="button" :disabled="loading" @click="submit">
+        {{ loading ? '跳转中...' : '前往授权服务注册' }}
+      </button>
 
       <div class="switch">
         <span>已有账号？</span>
-        <button type="button" @click="router.push('/login')">去登录</button>
+        <button type="button" @click="goLogin">去登录</button>
       </div>
     </main>
   </div>
@@ -58,49 +25,34 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import { useAuthStore } from '../stores/auth'
 
+const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const { loading } = storeToRefs(authStore)
 
-const username = ref('')
-const password = ref('')
-const confirmPassword = ref('')
 const errorMessage = ref('')
 
-const canSubmit = computed(
-  () =>
-    username.value.length > 0 &&
-    password.value.length > 0 &&
-    confirmPassword.value.length > 0,
-)
+const redirectPath = computed(() => firstQueryValue(route.query.redirect))
 
 async function submit() {
-  if (!canSubmit.value || loading.value) return
+  if (loading.value) return
   errorMessage.value = ''
-  if (password.value !== confirmPassword.value) {
-    errorMessage.value = '两次输入的密码不一致'
-    return
-  }
-
   try {
-    await authStore.submitRegister({
-      username: username.value,
-      password: password.value,
-    })
-    router.replace({
-      path: '/login',
-      query: {
-        registered: '1',
-        username: username.value,
-      },
-    })
+    await authStore.submitRegister({})
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '注册失败'
   }
+}
+
+function goLogin() {
+  router.push({
+    path: '/login',
+    query: redirectPath.value ? { redirect: redirectPath.value } : undefined,
+  })
 }
 
 function goBack() {
@@ -109,6 +61,13 @@ function goBack() {
     return
   }
   router.push('/')
+}
+
+function firstQueryValue(value: unknown): string {
+  if (Array.isArray(value)) {
+    return String(value[0] ?? '')
+  }
+  return typeof value === 'string' ? value : ''
 }
 </script>
 
@@ -144,7 +103,7 @@ function goBack() {
 }
 
 .content {
-  padding: 34px 28px 0;
+  padding: 42px 28px 0;
 }
 
 .eyebrow {
@@ -155,9 +114,9 @@ function goBack() {
 }
 
 h1 {
-  margin: 0 0 22px;
-  font-size: 32px;
-  line-height: 1.15;
+  margin: 0 0 24px;
+  font-size: 34px;
+  line-height: 1.1;
   letter-spacing: 0;
 }
 
@@ -173,39 +132,6 @@ h1 {
 .notice.error {
   background: rgba(254, 44, 85, 0.13);
   color: #ffb3c0;
-}
-
-.form {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-label {
-  color: rgba(255, 255, 255, 0.68);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-input {
-  width: 100%;
-  height: 48px;
-  margin-bottom: 8px;
-  padding: 0 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  outline: none;
-  background: rgba(255, 255, 255, 0.08);
-  color: #fff;
-  font: inherit;
-}
-
-input::placeholder {
-  color: rgba(255, 255, 255, 0.36);
-}
-
-input:focus {
-  border-color: rgba(37, 244, 238, 0.7);
 }
 
 .primary {

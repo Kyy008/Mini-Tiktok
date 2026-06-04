@@ -1,7 +1,7 @@
 <template>
   <div class="upload">
     <header class="bar">
-      <button class="back" @click="$router.back()">‹</button>
+      <button class="back" type="button" @click="$router.back()">‹</button>
       <span class="t">发布作品</span>
       <span style="width: 24px" />
     </header>
@@ -40,7 +40,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useVideoStore } from '../stores/video'
@@ -63,8 +63,10 @@ function onPick(e: Event) {
   if (!f) return
   if (f.type !== 'video/mp4') {
     ElMessage.error('仅支持 MP4 格式视频')
+    resetFileInput()
     return
   }
+  revokePreviewUrl()
   file.value = f
   previewUrl.value = URL.createObjectURL(f)
 }
@@ -75,6 +77,7 @@ async function submit() {
   try {
     await videoStore.publish(title.value.trim(), file.value)
     ElMessage.success('发布成功')
+    resetForm()
     router.push('/my/videos')
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '发布失败')
@@ -82,6 +85,28 @@ async function submit() {
     submitting.value = false
   }
 }
+
+function resetForm() {
+  revokePreviewUrl()
+  file.value = null
+  title.value = ''
+  resetFileInput()
+}
+
+function resetFileInput() {
+  if (fileInput.value) {
+    fileInput.value.value = ''
+  }
+}
+
+function revokePreviewUrl() {
+  if (previewUrl.value) {
+    URL.revokeObjectURL(previewUrl.value)
+    previewUrl.value = ''
+  }
+}
+
+onBeforeUnmount(revokePreviewUrl)
 </script>
 
 <style scoped>

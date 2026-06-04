@@ -11,18 +11,14 @@ import {
   unlikeVideo as unlikeVideoApi,
   uploadVideo as uploadVideoApi,
 } from '../api/video'
-import { MOCK_FEED, MOCK_MY_VIDEOS, mockComments } from '../mock/data'
-
-function clone<T>(v: T): T {
-  return JSON.parse(JSON.stringify(v))
-}
+import { mockComments } from '../mock/data'
 
 export const useVideoStore = defineStore('video', () => {
-  const feed = ref<VideoItem[]>(clone(MOCK_FEED))
-  const myVideos = ref<VideoItem[]>(clone(MOCK_MY_VIDEOS))
+  const feed = ref<VideoItem[]>([])
+  const myVideos = ref<VideoItem[]>([])
   const myVideosPage = ref(1)
   const myVideosSize = ref(10)
-  const myVideosTotal = ref(myVideos.value.length)
+  const myVideosTotal = ref(0)
   const myVideosHasMore = ref(false)
   const loading = ref(false)
   const feedLoading = ref(false)
@@ -39,13 +35,12 @@ export const useVideoStore = defineStore('video', () => {
     feedErrorMessage.value = ''
     try {
       const videos = await fetchRecommendations(size)
-      if (videos.length) {
-        feed.value = videos
-      }
-      return feed.value
+      feed.value = videos
+      return videos
     } catch (error) {
+      feed.value = []
       feedErrorMessage.value = getErrorMessage(error)
-      return feed.value
+      throw error
     } finally {
       feedLoading.value = false
     }
@@ -63,18 +58,19 @@ export const useVideoStore = defineStore('video', () => {
       if (status) {
         applyLikeState(videos, status.liked ?? nextLiked, status.likeCount ?? status.count)
       }
-    } catch {
-      // 推荐/点赞接口未合入时保持本地乐观更新，避免影响当前演示 UI。
+    } catch (error) {
+      applyLikeState(videos, !nextLiked)
+      throw error
     }
   }
 
   async function markViewed(id: number): Promise<void> {
     if (viewedVideoIds.value.has(id)) return
-    viewedVideoIds.value.add(id)
     try {
       await markVideoViewedApi(id)
-    } catch {
-      // 观看记录接口未合入时忽略失败；后端合入后会自动开始上报。
+      viewedVideoIds.value.add(id)
+    } catch (error) {
+      throw error
     }
   }
 
@@ -94,6 +90,11 @@ export const useVideoStore = defineStore('video', () => {
       myVideosHasMore.value = result.hasMore
       return result
     } catch (error) {
+      if (page === 1) {
+        myVideos.value = []
+        myVideosTotal.value = 0
+        myVideosHasMore.value = false
+      }
       errorMessage.value = getErrorMessage(error)
       throw error
     } finally {

@@ -48,9 +48,9 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, ref, watch } from 'vue'
+import { ref, watch } from 'vue'
 import type { VideoItem } from '../api/types'
-import { isApiVideoPlayUrl, resolveVideoPlaySource } from '../api/video'
+import { resolveVideoPlaySource } from '../api/video'
 import ActionRail from './ActionRail.vue'
 
 const props = defineProps<{ video: VideoItem; active: boolean }>()
@@ -61,7 +61,6 @@ const playing = ref(false)
 const showHeart = ref(false)
 const heartStyle = ref<Record<string, string>>({})
 const playSource = ref(props.video.playUrl)
-let objectUrl: string | null = null
 
 watch(
   () => props.active,
@@ -110,31 +109,8 @@ function onDouble(e: MouseEvent) {
 }
 
 async function loadPlaySource() {
-  revokeObjectUrl()
-  playSource.value = props.video.playUrl
-  if (!isApiVideoPlayUrl(props.video.playUrl)) {
-    return
-  }
-
-  try {
-    const source = await resolveVideoPlaySource(props.video)
-    playSource.value = source
-    if (source.startsWith('blob:')) {
-      objectUrl = source
-    }
-  } catch {
-    playSource.value = props.video.playUrl
-  }
+  playSource.value = resolveVideoPlaySource(props.video)
 }
-
-function revokeObjectUrl() {
-  if (objectUrl) {
-    URL.revokeObjectURL(objectUrl)
-    objectUrl = null
-  }
-}
-
-onBeforeUnmount(revokeObjectUrl)
 </script>
 
 <style scoped>
