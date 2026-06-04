@@ -16,6 +16,7 @@ import com.minitiktok.api.config.MockAuthSecurityConfig;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.minitiktok.api.entity.Video;
 import com.minitiktok.api.security.CurrentUserService;
+import com.minitiktok.api.service.InteractionService;
 import com.minitiktok.api.service.VideoService;
 import com.minitiktok.api.storage.StoredVideoFile;
 import com.minitiktok.api.storage.VideoStorageService;
@@ -48,6 +49,9 @@ class MockAuthModeVideoControllerTest {
     @MockBean
     private VideoService videoService;
 
+    @MockBean
+    private InteractionService interactionService;
+
     @Test
     void shouldReturnVideoDetailWhenUsingMockVideoReadToken() throws Exception {
         when(videoService.findActiveById(1L)).thenReturn(Optional.of(Video.builder()
@@ -58,6 +62,8 @@ class MockAuthModeVideoControllerTest {
                 .deleted(false)
                 .createdAt(LocalDateTime.of(2026, 5, 20, 12, 0))
                 .build()));
+        when(interactionService.getLikeCount(1L)).thenReturn(2L);
+        when(interactionService.isLikedByUser("local-reader", 1L)).thenReturn(false);
 
         mockMvc.perform(get("/api/videos/1")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer mock-video-read"))
@@ -66,7 +72,9 @@ class MockAuthModeVideoControllerTest {
                 .andExpect(jsonPath("$.data.id").value(1))
                 .andExpect(jsonPath("$.data.title").value("Demo Video"))
                 .andExpect(jsonPath("$.data.playUrl").value("/api/videos/1/play"))
-                .andExpect(jsonPath("$.data.uploaderId").value("local-uploader"));
+                .andExpect(jsonPath("$.data.uploaderId").value("local-uploader"))
+                .andExpect(jsonPath("$.data.likeCount").value(2))
+                .andExpect(jsonPath("$.data.liked").value(false));
     }
 
     @Test
@@ -110,6 +118,7 @@ class MockAuthModeVideoControllerTest {
                                         .deleted(false)
                                         .createdAt(LocalDateTime.of(2026, 5, 22, 11, 0))
                                         .build())));
+        when(interactionService.getLikeCount(20L)).thenReturn(5L);
 
         mockMvc.perform(get("/api/my/videos")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer mock-video-read"))
@@ -120,7 +129,8 @@ class MockAuthModeVideoControllerTest {
                 .andExpect(jsonPath("$.data.total").value(1))
                 .andExpect(jsonPath("$.data.records[0].id").value(20))
                 .andExpect(jsonPath("$.data.records[0].title").value("Reader Video"))
-                .andExpect(jsonPath("$.data.records[0].playUrl").value("/api/videos/20/play"));
+                .andExpect(jsonPath("$.data.records[0].playUrl").value("/api/videos/20/play"))
+                .andExpect(jsonPath("$.data.records[0].likeCount").value(5));
     }
 
     @Test
@@ -136,6 +146,7 @@ class MockAuthModeVideoControllerTest {
                                         .deleted(false)
                                         .createdAt(LocalDateTime.of(2026, 5, 22, 12, 0))
                                         .build())));
+        when(interactionService.getLikeCount(21L)).thenReturn(3L);
 
         mockMvc.perform(get("/api/my/videos")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer mock-video-write"))
@@ -143,7 +154,8 @@ class MockAuthModeVideoControllerTest {
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.records[0].id").value(21))
                 .andExpect(jsonPath("$.data.records[0].title").value("Uploader Video"))
-                .andExpect(jsonPath("$.data.records[0].playUrl").value("/api/videos/21/play"));
+                .andExpect(jsonPath("$.data.records[0].playUrl").value("/api/videos/21/play"))
+                .andExpect(jsonPath("$.data.records[0].likeCount").value(3));
     }
 
     @Test
