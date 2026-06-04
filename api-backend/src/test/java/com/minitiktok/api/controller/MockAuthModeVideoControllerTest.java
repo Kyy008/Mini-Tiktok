@@ -122,6 +122,13 @@ class MockAuthModeVideoControllerTest {
     }
 
     @Test
+    void shouldNotUseBearerCookieForNonPlaybackEndpoint() throws Exception {
+        mockMvc.perform(get("/api/videos/1")
+                        .cookie(new Cookie("mini_tiktok_access_token", "mock-video-read")))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void shouldReturnForbiddenWhenUsingMockVideoWriteTokenForReadEndpoint() throws Exception {
         mockMvc.perform(get("/api/videos/1")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer mock-video-write"))

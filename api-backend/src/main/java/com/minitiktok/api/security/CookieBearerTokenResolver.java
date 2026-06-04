@@ -12,6 +12,7 @@ import jakarta.servlet.http.HttpServletRequest;
 
 public class CookieBearerTokenResolver implements BearerTokenResolver {
     public static final String ACCESS_TOKEN_COOKIE_NAME = "mini_tiktok_access_token";
+    private static final String PLAY_ENDPOINT_PATTERN = "^/api/videos/\\d+/play$";
 
     private final DefaultBearerTokenResolver headerResolver = new DefaultBearerTokenResolver();
 
@@ -20,6 +21,9 @@ public class CookieBearerTokenResolver implements BearerTokenResolver {
         String headerToken = headerResolver.resolve(request);
         if (StringUtils.hasText(headerToken)) {
             return headerToken;
+        }
+        if (!isPlayableVideoRequest(request)) {
+            return null;
         }
 
         Cookie[] cookies = request.getCookies();
@@ -33,5 +37,18 @@ public class CookieBearerTokenResolver implements BearerTokenResolver {
             }
         }
         return null;
+    }
+
+    private boolean isPlayableVideoRequest(HttpServletRequest request) {
+        String path = request.getServletPath();
+        if (!StringUtils.hasText(path)) {
+            path = request.getRequestURI();
+            String contextPath = request.getContextPath();
+            if (StringUtils.hasText(contextPath) && path.startsWith(contextPath)) {
+                path = path.substring(contextPath.length());
+            }
+        }
+        return "GET".equals(request.getMethod())
+                && path.matches(PLAY_ENDPOINT_PATTERN);
     }
 }
