@@ -77,11 +77,31 @@ export const useAuthStore = defineStore('auth', {
         this.loading = false
       }
     },
-    async submitRegister(_payload: PasswordPayload): Promise<void> {
-      this.register()
+    async submitRegister(payload: PasswordPayload): Promise<void> {
+      this.loading = true
+      this.error = null
+      try {
+        await this.register({ redirectPath: payload.redirectPath })
+      } catch (error) {
+        this.error = authErrorMessage(error)
+        throw new Error(this.error)
+      } finally {
+        this.loading = false
+      }
     },
-    register(): void {
-      window.location.assign(buildRegisterUrl())
+    async register(options?: { redirectPath?: string }): Promise<void> {
+      this.error = null
+      const pkce = await createPkceParams()
+      savePkce({
+        codeVerifier: pkce.codeVerifier,
+        state: pkce.state,
+        redirectPath: sanitizeRedirectPath(options?.redirectPath),
+      })
+      const continueUrl = buildAuthorizationUrl({
+        codeChallenge: pkce.codeChallenge,
+        state: pkce.state,
+      })
+      window.location.assign(buildRegisterUrl({ continueUrl }))
     },
     async handleCallback(code: string, state: string): Promise<CallbackResult> {
       this.loading = true

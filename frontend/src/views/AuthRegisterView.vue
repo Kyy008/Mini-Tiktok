@@ -42,7 +42,9 @@ async function submit() {
   if (loading.value) return
   errorMessage.value = ''
   try {
-    await authStore.submitRegister({})
+    await authStore.submitRegister({
+      redirectPath: redirectPath.value,
+    })
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '注册失败'
   }

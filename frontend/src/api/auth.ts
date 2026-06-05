@@ -25,8 +25,12 @@ export function buildAuthorizationUrl(params: { codeChallenge: string; state: st
   return url.toString()
 }
 
-export function buildRegisterUrl(): string {
-  return new URL('/register', AUTH_BASE_URL).toString()
+export function buildRegisterUrl(params?: { continueUrl?: string }): string {
+  const url = new URL('/register', AUTH_BASE_URL)
+  if (params?.continueUrl) {
+    url.searchParams.set('continue', params.continueUrl)
+  }
+  return url.toString()
 }
 
 export function buildLogoutUrl(): string {

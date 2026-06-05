@@ -99,7 +99,7 @@
         <input id="password" name="password" type="password" autocomplete="current-password" required>
 
         <button type="submit">Sign in</button>
-        <a class="button" th:href="@{/register}">Register</a>
+        <a class="button" th:href="${continueUrl != null} ? @{/register(continue=${continueUrl})} : @{/register}">Register</a>
         <a class="button" th:href="${frontendBaseUrl}">Back</a>
     </form>
 </main>

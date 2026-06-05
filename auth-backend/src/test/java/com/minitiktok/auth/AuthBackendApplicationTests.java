@@ -354,6 +354,36 @@ class AuthBackendApplicationTests {
     }
 
     @Test
+    void formRegisterWithContinueRedirectsBackToAuthorizationEndpoint() throws Exception {
+        String continueUrl = "/oauth2/authorize?response_type=code&client_id=tiktok-web";
+
+        mockMvc.perform(post("/register")
+                        .with(csrf())
+                        .param("username", "oauthregister")
+                        .param("password", "Secret123")
+                        .param("continue", continueUrl))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl(continueUrl));
+
+        Integer count = jdbcTemplate.queryForObject(
+                "select count(*) from users where username = ?",
+                Integer.class,
+                "oauthregister");
+        assertThat(count).isEqualTo(1);
+    }
+
+    @Test
+    void formRegisterIgnoresExternalContinueUrl() throws Exception {
+        mockMvc.perform(post("/register")
+                        .with(csrf())
+                        .param("username", "safeuser")
+                        .param("password", "Secret123")
+                        .param("continue", "https://example.com/oauth2/authorize"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login?registered"));
+    }
+
+    @Test
     void formRegisterRequiresCsrfToken() throws Exception {
         mockMvc.perform(post("/register")
                         .param("username", "csrfuser")
