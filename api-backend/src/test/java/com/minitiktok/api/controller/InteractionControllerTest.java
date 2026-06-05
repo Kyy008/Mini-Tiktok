@@ -144,11 +144,16 @@ class InteractionControllerTest {
     @Test
     void shouldLikeVideoWhenUserHasVideoLikeScope() throws Exception {
         when(videoService.findActiveById(1L)).thenReturn(Optional.of(activeVideo(1L)));
+        when(interactionService.getLikeCount(1L)).thenReturn(8L);
+        when(interactionService.isLikedByUser("user-1", 1L)).thenReturn(true);
 
         mockMvc.perform(post("/api/videos/1/likes")
                         .with(likeJwt()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(200));
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.videoId").value(1))
+                .andExpect(jsonPath("$.data.likeCount").value(8))
+                .andExpect(jsonPath("$.data.liked").value(true));
 
         verify(interactionService).likeVideo("user-1", 1L);
     }
@@ -178,11 +183,16 @@ class InteractionControllerTest {
     @Test
     void shouldUnlikeVideoWhenUserHasVideoLikeScope() throws Exception {
         when(videoService.findActiveById(1L)).thenReturn(Optional.of(activeVideo(1L)));
+        when(interactionService.getLikeCount(1L)).thenReturn(6L);
+        when(interactionService.isLikedByUser("user-1", 1L)).thenReturn(false);
 
         mockMvc.perform(delete("/api/videos/1/likes")
                         .with(likeJwt()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(200));
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.videoId").value(1))
+                .andExpect(jsonPath("$.data.likeCount").value(6))
+                .andExpect(jsonPath("$.data.liked").value(false));
 
         verify(interactionService).unlikeVideo("user-1", 1L);
     }

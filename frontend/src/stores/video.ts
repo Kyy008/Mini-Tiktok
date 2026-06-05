@@ -84,8 +84,10 @@ export const useVideoStore = defineStore('video', () => {
     applyLikeState(videos, nextLiked)
 
     try {
-      await (nextLiked ? likeVideoApi(id) : unlikeVideoApi(id))
-      await refreshLikeStatus(id)
+      const status = await (nextLiked ? likeVideoApi(id) : unlikeVideoApi(id))
+      if (status) {
+        applyLikeState(findInAll(id), status.liked ?? nextLiked, status.likeCount ?? status.count)
+      }
     } catch (error) {
       applyLikeState(videos, !nextLiked)
       throw error

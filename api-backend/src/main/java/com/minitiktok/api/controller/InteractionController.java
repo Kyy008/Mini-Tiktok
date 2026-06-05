@@ -37,24 +37,24 @@ public class InteractionController {
 
     // 2. 点赞视频：POST /api/videos/{id}/likes
     @PostMapping("/api/videos/{id}/likes")
-    public Result<Void> likeVideo(@PathVariable("id") Long id) {
+    public Result<VideoLikeStatusResponse> likeVideo(@PathVariable("id") Long id) {
         // 核心要求：删除或不存在的视频返回 404
         videoService.findActiveById(id).orElseThrow(VideoNotFoundException::new);
 
         String userId = currentUserService.getCurrentUser().userId();
         interactionService.likeVideo(userId, id);
-        return Result.success();
+        return Result.success(likeStatus(id, userId, true));
     }
 
     // 3. 取消点赞：DELETE /api/videos/{id}/likes
     @DeleteMapping("/api/videos/{id}/likes")
-    public Result<Void> unlikeVideo(@PathVariable("id") Long id) {
+    public Result<VideoLikeStatusResponse> unlikeVideo(@PathVariable("id") Long id) {
         // 未点赞或不存在的保持稳定返回成功，但仍需验证视频活跃性
         videoService.findActiveById(id).orElseThrow(VideoNotFoundException::new);
 
         String userId = currentUserService.getCurrentUser().userId();
         interactionService.unlikeVideo(userId, id);
-        return Result.success();
+        return Result.success(likeStatus(id, userId, false));
     }
 
     // 4. 查询点赞状态与数量：GET /api/videos/{id}/likes
@@ -78,5 +78,13 @@ public class InteractionController {
         String userId = currentUserService.getCurrentUser().userId();
         interactionService.recordView(userId, id);
         return Result.success();
+    }
+
+    private VideoLikeStatusResponse likeStatus(Long videoId, String userId, boolean fallbackLiked) {
+        long likeCount = interactionService.getLikeCount(videoId);
+        boolean liked = userId == null || userId.isBlank()
+                ? fallbackLiked
+                : interactionService.isLikedByUser(userId, videoId);
+        return new VideoLikeStatusResponse(videoId, likeCount, liked);
     }
 }
