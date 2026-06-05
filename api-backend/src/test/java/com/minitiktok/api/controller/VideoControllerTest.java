@@ -88,6 +88,27 @@ class VideoControllerTest {
     }
 
     @Test
+    void shouldReturnVideoDetailForGuestWithoutLikedState() throws Exception {
+        when(videoService.findActiveById(1L)).thenReturn(Optional.of(Video.builder()
+                .id(1L)
+                .title("Guest Video")
+                .fileHash("hash123")
+                .uploaderId("uploader-1")
+                .deleted(false)
+                .createdAt(LocalDateTime.of(2026, 5, 20, 12, 0))
+                .build()));
+        when(interactionService.getLikeCount(1L)).thenReturn(4L);
+
+        mockMvc.perform(get("/api/videos/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(1))
+                .andExpect(jsonPath("$.data.likeCount").value(4))
+                .andExpect(jsonPath("$.data.liked").value(false));
+
+        verify(interactionService, never()).isLikedByUser(any(), eq(1L));
+    }
+
+    @Test
     void shouldReturnNotFoundWhenVideoDetailDoesNotExist() throws Exception {
         when(videoService.findActiveById(99L)).thenReturn(Optional.empty());
 
@@ -309,25 +330,50 @@ class VideoControllerTest {
     }
 
     @Test
-    void shouldReturnForbiddenForPlayEndpointWithoutVideoReadScope() throws Exception {
+    void shouldStreamVideoForPublicPlayEndpointWithoutVideoReadScope() throws Exception {
+        byte[] videoContent = "video-binary".getBytes(StandardCharsets.UTF_8);
+        when(videoService.findActiveById(1L)).thenReturn(Optional.of(Video.builder()
+                .id(1L)
+                .title("Demo Video")
+                .fileHash("hash123")
+                .uploaderId("uploader-1")
+                .deleted(false)
+                .createdAt(LocalDateTime.of(2026, 5, 20, 12, 0))
+                .build()));
+        when(videoStorageService.loadAsResource("hash123"))
+                .thenReturn(Optional.of(new ByteArrayResource(videoContent)));
+
         mockMvc.perform(get("/api/videos/1/play")
                         .with(jwt().authorities(() -> "SCOPE_video:write")
                                 .jwt(jwt -> jwt
                                         .subject("1")
                                         .claim("preferred_username", "demo")
                                         .claim("scope", "video:write"))))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk())
+                .andExpect(content().bytes(videoContent));
     }
 
     @Test
-    void shouldReturnForbiddenForReadEndpointsWithoutVideoReadScope() throws Exception {
+    void shouldReturnVideoDetailForPublicReadEndpointWithoutVideoReadScope() throws Exception {
+        when(videoService.findActiveById(1L)).thenReturn(Optional.of(Video.builder()
+                .id(1L)
+                .title("Demo Video")
+                .fileHash("hash123")
+                .uploaderId("uploader-1")
+                .deleted(false)
+                .createdAt(LocalDateTime.of(2026, 5, 20, 12, 0))
+                .build()));
+        when(interactionService.getLikeCount(1L)).thenReturn(4L);
+
         mockMvc.perform(get("/api/videos/1")
                         .with(jwt().authorities(() -> "SCOPE_video:write")
                                 .jwt(jwt -> jwt
                                         .subject("1")
                                         .claim("preferred_username", "demo")
                                         .claim("scope", "video:write"))))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(1))
+                .andExpect(jsonPath("$.data.liked").value(false));
     }
 
     @Test
@@ -403,6 +449,19 @@ class VideoControllerTest {
                         .param("page", "1")
                         .param("size", "10"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldReturnForbiddenForMyVideosWithoutVideoReadScope() throws Exception {
+        mockMvc.perform(get("/api/my/videos")
+                        .param("page", "1")
+                        .param("size", "10")
+                        .with(jwt().authorities(() -> "SCOPE_video:write")
+                                .jwt(jwt -> jwt
+                                        .subject("1")
+                                        .claim("preferred_username", "demo")
+                                        .claim("scope", "video:write"))))
+                .andExpect(status().isForbidden());
     }
 
     @Test

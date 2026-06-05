@@ -10,6 +10,7 @@ import com.minitiktok.api.service.VideoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import com.minitiktok.api.security.CurrentUser;
 
 @RestController
 @RequiredArgsConstructor
@@ -27,7 +28,9 @@ public class InteractionController {
             throw new IllegalArgumentException("Recommendation size must be greater than or equal to 1");
         }
         if (size > 50) size = 50; // 对应方案要求的上限校验
-        String userId = currentUserService.getCurrentUser().userId();
+        String userId = currentUserService.findCurrentUser()
+                .map(CurrentUser::userId)
+                .orElse(null);
         List<VideoRecommendationVO> recommendations = videoService.getRecommendations(userId, size);
         return Result.success(recommendations);
     }
@@ -59,9 +62,10 @@ public class InteractionController {
     public Result<VideoLikeStatusResponse> getLikeStatus(@PathVariable("id") Long id) {
         videoService.findActiveById(id).orElseThrow(VideoNotFoundException::new);
 
-        String userId = currentUserService.getCurrentUser().userId();
         long likeCount = interactionService.getLikeCount(id);
-        boolean liked = interactionService.isLikedByUser(userId, id);
+        boolean liked = currentUserService.findCurrentUser()
+                .map(user -> interactionService.isLikedByUser(user.userId(), id))
+                .orElse(false);
 
         return Result.success(new VideoLikeStatusResponse(id, likeCount, liked));
     }

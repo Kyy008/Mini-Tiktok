@@ -122,17 +122,39 @@ class MockAuthModeVideoControllerTest {
     }
 
     @Test
-    void shouldNotUseBearerCookieForNonPlaybackEndpoint() throws Exception {
+    void shouldReturnPublicDetailWhenBearerCookieIsOnlyCredentialOnNonPlaybackEndpoint() throws Exception {
+        when(videoService.findActiveById(1L)).thenReturn(Optional.of(Video.builder()
+                .id(1L)
+                .title("Public Video")
+                .fileHash("hash123")
+                .uploaderId("owner")
+                .deleted(false)
+                .createdAt(LocalDateTime.of(2026, 5, 20, 12, 0))
+                .build()));
+
         mockMvc.perform(get("/api/videos/1")
                         .cookie(new Cookie("mini_tiktok_access_token", "mock-video-read")))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(1))
+                .andExpect(jsonPath("$.data.liked").value(false));
     }
 
     @Test
-    void shouldReturnForbiddenWhenUsingMockVideoWriteTokenForReadEndpoint() throws Exception {
+    void shouldReturnVideoDetailWhenUsingMockVideoWriteTokenForPublicReadEndpoint() throws Exception {
+        when(videoService.findActiveById(1L)).thenReturn(Optional.of(Video.builder()
+                .id(1L)
+                .title("Public Video")
+                .fileHash("hash123")
+                .uploaderId("local-uploader")
+                .deleted(false)
+                .createdAt(LocalDateTime.of(2026, 5, 22, 12, 0))
+                .build()));
+
         mockMvc.perform(get("/api/videos/1")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer mock-video-write"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(1))
+                .andExpect(jsonPath("$.data.liked").value(false));
     }
 
     @Test
@@ -164,28 +186,10 @@ class MockAuthModeVideoControllerTest {
     }
 
     @Test
-    void shouldReturnMyVideosPageWhenUsingMockVideoWriteToken() throws Exception {
-        when(videoService.pageActiveByUploaderId("local-uploader", 1L, 10L))
-                .thenReturn(new Page<Video>(1, 10, 1)
-                        .setRecords(java.util.List.of(
-                                Video.builder()
-                                        .id(21L)
-                                        .title("Uploader Video")
-                                        .fileHash("hash999")
-                                        .uploaderId("local-uploader")
-                                        .deleted(false)
-                                        .createdAt(LocalDateTime.of(2026, 5, 22, 12, 0))
-                                        .build())));
-        when(interactionService.getLikeCount(21L)).thenReturn(3L);
-
+    void shouldReturnForbiddenForMyVideosWhenUsingMockVideoWriteToken() throws Exception {
         mockMvc.perform(get("/api/my/videos")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer mock-video-write"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.data.records[0].id").value(21))
-                .andExpect(jsonPath("$.data.records[0].title").value("Uploader Video"))
-                .andExpect(jsonPath("$.data.records[0].playUrl").value("/api/videos/21/play"))
-                .andExpect(jsonPath("$.data.records[0].likeCount").value(3));
+                .andExpect(status().isForbidden());
     }
 
     @Test

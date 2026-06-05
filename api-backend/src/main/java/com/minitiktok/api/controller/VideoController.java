@@ -10,7 +10,9 @@ import com.minitiktok.api.exception.ForbiddenVideoOperationException;
 import com.minitiktok.api.exception.VideoNotFoundException;
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 import com.minitiktok.api.security.CurrentUserService;
+import com.minitiktok.api.security.CurrentUser;
 import com.minitiktok.api.service.InteractionService;
 import com.minitiktok.api.service.VideoService;
 import com.minitiktok.api.storage.StoredVideoFile;
@@ -43,9 +45,11 @@ public class VideoController {
     public Result<VideoDetailResponse> getVideoDetail(@PathVariable("id") Long id) {
         Video video = videoService.findActiveById(id)
                 .orElseThrow(VideoNotFoundException::new);
-        String userId = currentUserService.getCurrentUser().userId();
         long likeCount = interactionService.getLikeCount(id);
-        boolean liked = interactionService.isLikedByUser(userId, id);
+        Optional<CurrentUser> currentUser = currentUserService.findCurrentUser();
+        boolean liked = currentUser
+                .map(user -> interactionService.isLikedByUser(user.userId(), id))
+                .orElse(false);
         return Result.success(toVideoDetailResponse(video, likeCount, liked));
     }
 

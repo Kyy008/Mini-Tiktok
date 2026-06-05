@@ -13,6 +13,7 @@ import {
   unlikeVideo as unlikeVideoApi,
   uploadVideo as uploadVideoApi,
 } from '../api/video'
+import { getAccessToken } from '../utils/token'
 
 export const useVideoStore = defineStore('video', () => {
   const feed = ref<VideoItem[]>([])
@@ -55,6 +56,10 @@ export const useVideoStore = defineStore('video', () => {
 
   async function loadVideoDetail(id: number): Promise<VideoItem> {
     const detail = await fetchVideo(id)
+    if (!getAccessToken()) {
+      replaceVideo(detail)
+      return detail
+    }
     const likeStatus = await getVideoLikeStatus(id)
     if (likeStatus) {
       detail.liked = likeStatus.liked ?? detail.liked
@@ -65,6 +70,7 @@ export const useVideoStore = defineStore('video', () => {
   }
 
   async function refreshLikeStatus(id: number): Promise<void> {
+    if (!getAccessToken()) return
     const status = await getVideoLikeStatus(id)
     if (!status) return
     applyLikeState(findInAll(id), status.liked ?? false, status.likeCount ?? status.count)
@@ -87,6 +93,7 @@ export const useVideoStore = defineStore('video', () => {
   }
 
   async function markViewed(id: number): Promise<void> {
+    if (!getAccessToken()) return
     if (viewedVideoIds.value.has(id)) return
     try {
       await markVideoViewedApi(id)

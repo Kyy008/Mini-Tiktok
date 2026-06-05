@@ -64,6 +64,26 @@ class InteractionControllerTest {
     }
 
     @Test
+    void shouldReturnGuestRecommendationsWithoutToken() throws Exception {
+        when(videoService.getRecommendations(null, 10)).thenReturn(List.of(
+                new VideoRecommendationVO(
+                        2L,
+                        "Guest Video",
+                        5L,
+                        false,
+                        "/api/videos/2/play",
+                        LocalDateTime.of(2026, 6, 3, 13, 0))));
+
+        mockMvc.perform(get("/api/videos/recommendations"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data[0].id").value(2))
+                .andExpect(jsonPath("$.data[0].liked").value(false));
+
+        verify(videoService).getRecommendations(null, 10);
+    }
+
+    @Test
     void shouldRejectRecommendationSizeBelowOne() throws Exception {
         mockMvc.perform(get("/api/videos/recommendations")
                         .param("size", "0")
@@ -89,8 +109,10 @@ class InteractionControllerTest {
     }
 
     @Test
-    void shouldReturnUnauthorizedForRecommendationsWithoutToken() throws Exception {
-        mockMvc.perform(get("/api/videos/recommendations"))
+    void shouldRejectRecordingViewWithoutToken() throws Exception {
+        when(videoService.findActiveById(1L)).thenReturn(Optional.of(activeVideo(1L)));
+
+        mockMvc.perform(post("/api/videos/1/views"))
                 .andExpect(status().isUnauthorized());
     }
 

@@ -88,6 +88,21 @@ class InteractionRecommendationIntegrationTest {
     }
 
     @Test
+    void shouldRecommendActiveVideosForGuestWithoutPersonalState() {
+        Video first = insertVideo("First", "owner", LocalDateTime.of(2026, 6, 3, 10, 0));
+        Video second = insertVideo("Second", "owner", LocalDateTime.of(2026, 6, 3, 11, 0));
+        insertVideo("Deleted", "owner", LocalDateTime.of(2026, 6, 3, 12, 0), true);
+        interactionService.likeVideo("user-1", first.getId());
+
+        List<VideoRecommendationVO> recommendations = videoService.getRecommendations(null, 10);
+
+        assertIterableEquals(
+                List.of(first.getId(), second.getId()),
+                recommendations.stream().map(VideoRecommendationVO::getId).toList());
+        assertEquals(false, recommendations.get(0).getLiked());
+    }
+
+    @Test
     void shouldIsolateViewHistoryByUserAndReturnEmptyWhenEverythingWasViewed() {
         Video first = insertVideo("First", "owner", LocalDateTime.of(2026, 6, 3, 10, 0));
         Video second = insertVideo("Second", "owner", LocalDateTime.of(2026, 6, 3, 11, 0));

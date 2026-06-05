@@ -51,15 +51,21 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import VideoCard from '../components/VideoCard.vue'
 import CommentSheet from '../components/CommentSheet.vue'
 import { useVideoStore } from '../stores/video'
+import { useAuthStore } from '../stores/auth'
 
 defineOptions({ name: 'RecommendView' })
 
 const videoStore = useVideoStore()
+const authStore = useAuthStore()
+const route = useRoute()
+const router = useRouter()
 const { feed, feedLoading, feedErrorMessage } = storeToRefs(videoStore)
+const { isAuthenticated } = storeToRefs(authStore)
 
 const tab = ref<'follow' | 'recommend'>('recommend')
 const scroller = ref<HTMLElement | null>(null)
@@ -77,6 +83,13 @@ function openComments(id: number) {
 }
 
 async function onLike(id: number) {
+  if (!isAuthenticated.value) {
+    await router.push({
+      path: '/login',
+      query: { redirect: route.fullPath },
+    })
+    return
+  }
   try {
     await videoStore.toggleLike(id)
   } catch (error) {

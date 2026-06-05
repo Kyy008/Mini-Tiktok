@@ -2,6 +2,7 @@ package com.minitiktok.api.security;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -13,9 +14,14 @@ import org.springframework.stereotype.Service;
 public class CurrentUserService {
 
     public CurrentUser getCurrentUser() {
+        return findCurrentUser()
+                .orElseThrow(() -> new IllegalStateException("Current authentication is not a JWT authentication"));
+    }
+
+    public Optional<CurrentUser> findCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (!(authentication instanceof JwtAuthenticationToken jwtAuthenticationToken)) {
-            throw new IllegalStateException("Current authentication is not a JWT authentication");
+            return Optional.empty();
         }
 
         Jwt jwt = jwtAuthenticationToken.getToken();
@@ -30,7 +36,7 @@ public class CurrentUserService {
         }
 
         List<String> scopes = extractScopes(jwt.getClaim("scope"));
-        return new CurrentUser(userId, username, scopes);
+        return Optional.of(new CurrentUser(userId, username, scopes));
     }
 
     private List<String> extractScopes(Object scopeClaim) {
