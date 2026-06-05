@@ -656,6 +656,31 @@ class VideoControllerTest {
     }
 
     @Test
+    void shouldReturnBadRequestWhenLegacyMultipartUploadIsTooLarge() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "demo.mp4",
+                "video/mp4",
+                new byte[10 * 1024 * 1024 + 1]);
+
+        mockMvc.perform(multipart("/api/videos")
+                        .file(file)
+                        .param("title", "Demo Video")
+                        .with(jwt().authorities(() -> "SCOPE_video:write")
+                                .jwt(jwt -> jwt
+                                        .subject("1")
+                                        .claim("preferred_username", "demo")
+                                        .claim("scope", "video:write"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message")
+                        .value("Legacy multipart upload size must not exceed 10 MB; use resumable upload for larger videos"));
+
+        verify(videoStorageService, never()).store(any());
+        verify(videoService, never()).createUploadedVideo(any(), any(), any(), any());
+    }
+
+    @Test
     void shouldReturnBadRequestWhenStorageRejectsUploadedFile() throws Exception {
         MockMultipartFile file = new MockMultipartFile(
                 "file",

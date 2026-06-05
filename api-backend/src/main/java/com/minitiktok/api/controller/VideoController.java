@@ -40,6 +40,7 @@ import org.springframework.web.multipart.MultipartFile;
 @RequiredArgsConstructor
 public class VideoController {
     private static final int MAX_TITLE_LENGTH = 128;
+    private static final long LEGACY_MULTIPART_UPLOAD_MAX_BYTES = 10L * 1024 * 1024;
 
     private final CurrentUserService currentUserService;
     private final VideoStorageService videoStorageService;
@@ -73,6 +74,7 @@ public class VideoController {
             @RequestParam("file") MultipartFile file,
             @RequestParam("title") String title) {
         String normalizedTitle = normalizeTitle(title);
+        validateLegacyMultipartUploadSize(file);
         String uploaderId = currentUserService.getCurrentUser().userId();
         StoredVideoFile storedVideoFile = videoStorageService.store(file);
         LocalDateTime createdAt = LocalDateTime.now();
@@ -136,6 +138,13 @@ public class VideoController {
             throw new IllegalArgumentException("Video title must not exceed 128 characters");
         }
         return normalizedTitle;
+    }
+
+    private void validateLegacyMultipartUploadSize(MultipartFile file) {
+        if (file != null && file.getSize() > LEGACY_MULTIPART_UPLOAD_MAX_BYTES) {
+            throw new IllegalArgumentException(
+                    "Legacy multipart upload size must not exceed 10 MB; use resumable upload for larger videos");
+        }
     }
 
     private VideoDetailResponse toVideoDetailResponse(Video video, long likeCount, boolean liked) {
