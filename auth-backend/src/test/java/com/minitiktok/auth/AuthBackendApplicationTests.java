@@ -196,10 +196,10 @@ class AuthBackendApplicationTests {
                         .queryParam("error", ""))
                 .andExpect(status().isOk())
                 .andExpect(view().name("login"))
-                .andExpect(content().string(containsString("Mini-Tiktok Login")))
-                .andExpect(content().string(containsString("Registration complete. Please sign in.")))
-                .andExpect(content().string(containsString("You have signed out.")))
-                .andExpect(content().string(containsString("Invalid username or password.")))
+                .andExpect(content().string(containsString("Mini-Tiktok 登录")))
+                .andExpect(content().string(containsString("注册成功，请登录。")))
+                .andExpect(content().string(containsString("已退出登录。")))
+                .andExpect(content().string(containsString("用户名或密码错误。")))
                 .andExpect(content().string(containsString("name=\"_csrf\"")));
     }
 
@@ -209,7 +209,7 @@ class AuthBackendApplicationTests {
                 .andExpect(status().isOk())
                 .andExpect(view().name("register"))
                 .andExpect(model().attributeExists("registerRequest"))
-                .andExpect(content().string(containsString("Create Account")))
+                .andExpect(content().string(containsString("创建账号")))
                 .andExpect(content().string(containsString("name=\"_csrf\"")));
     }
 
@@ -451,7 +451,7 @@ class AuthBackendApplicationTests {
                         .param("password", "Secret123"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("register"))
-                .andExpect(model().attribute("registerError", equalTo("username already exists")));
+                .andExpect(model().attribute("registerError", equalTo("用户名已存在")));
     }
 
     @Test

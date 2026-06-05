@@ -31,7 +31,7 @@ public class UserService {
     public User register(String username, String password) {
         String normalizedUsername = username == null ? "" : username.trim();
         if (findByUsername(normalizedUsername).isPresent()) {
-            throw new IllegalArgumentException("username already exists");
+            throw new IllegalArgumentException("用户名已存在");
         }
 
         LocalDateTime now = LocalDateTime.now();

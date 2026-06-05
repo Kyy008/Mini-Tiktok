@@ -5,12 +5,12 @@ import jakarta.validation.constraints.Size;
 
 public class RegisterRequest {
 
-    @NotBlank(message = "username is required")
-    @Size(min = 3, max = 32, message = "username length must be 3-32")
+    @NotBlank(message = "请输入用户名")
+    @Size(min = 3, max = 32, message = "用户名长度需为 3-32 位")
     private String username;
 
-    @NotBlank(message = "password is required")
-    @Size(min = 6, max = 64, message = "password length must be 6-64")
+    @NotBlank(message = "请输入密码")
+    @Size(min = 6, max = 64, message = "密码长度需为 6-64 位")
     private String password;
 
     public String getUsername() {
