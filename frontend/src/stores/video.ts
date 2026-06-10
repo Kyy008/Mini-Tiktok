@@ -19,7 +19,7 @@ export const useVideoStore = defineStore('video', () => {
   const feed = ref<VideoItem[]>([])
   const myVideos = ref<VideoItem[]>([])
   const myVideosPage = ref(1)
-  const myVideosSize = ref(10)
+  const myVideosSize = ref(5)
   const myVideosTotal = ref(0)
   const myVideosHasMore = ref(false)
   const loading = ref(false)
@@ -114,7 +114,7 @@ export const useVideoStore = defineStore('video', () => {
     errorMessage.value = ''
     try {
       const result = await fetchMyVideos(page, size)
-      myVideos.value = page === 1 ? result.list : [...myVideos.value, ...result.list]
+      myVideos.value = result.list
       myVideosPage.value = result.page
       myVideosSize.value = result.size
       myVideosTotal.value = result.total

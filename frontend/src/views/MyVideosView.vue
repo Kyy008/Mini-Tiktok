@@ -28,7 +28,7 @@
       </header>
 
       <div class="tabs">
-        <span class="on">作品 {{ isAuthenticated ? myVideos.length : 0 }}</span>
+        <span class="on">作品 {{ isAuthenticated ? myVideosTotal : 0 }}</span>
         <span>喜欢</span>
         <span>收藏</span>
       </div>
@@ -43,7 +43,7 @@
       <div v-else-if="loading" class="empty">正在加载作品...</div>
       <div v-else-if="errorMessage" class="empty action-empty">
         {{ errorMessage }}
-        <button class="login-inline" type="button" @click="loadVideos">重试</button>
+        <button class="login-inline" type="button" @click="loadPage(myVideosPage)">重试</button>
       </div>
       <template v-else>
         <div v-if="myVideos.length" class="grid">
@@ -52,14 +52,47 @@
             <span class="like-tag">♥ {{ v.likeCount }}</span>
           </div>
         </div>
-        <button
-          v-if="myVideosHasMore"
-          class="load-more"
-          type="button"
-          @click="loadMore"
-        >
-          加载更多
-        </button>
+
+        <div v-if="myVideosTotal > 0" class="pager">
+          <label class="page-size">
+            <span>每页</span>
+            <select v-model.number="selectedPageSize" @change="onPageSizeChange">
+              <option :value="5">5</option>
+              <option :value="10">10</option>
+            </select>
+          </label>
+
+          <div class="page-controls">
+            <button
+              type="button"
+              :disabled="myVideosPage <= 1 || loading"
+              @click="loadPage(myVideosPage - 1)"
+            >
+              上一页
+            </button>
+            <button
+              v-for="page in visiblePages"
+              :key="page"
+              type="button"
+              class="page-number"
+              :class="{ active: page === myVideosPage }"
+              :disabled="loading"
+              @click="loadPage(page)"
+            >
+              {{ page }}
+            </button>
+            <button
+              type="button"
+              :disabled="myVideosPage >= totalPages || loading"
+              @click="loadPage(myVideosPage + 1)"
+            >
+              下一页
+            </button>
+          </div>
+
+          <div class="page-summary">第 {{ myVideosPage }} / {{ totalPages }} 页，共 {{ myVideosTotal }} 项</div>
+        </div>
+
         <div v-if="!myVideos.length" class="empty">还没有发布作品，去发一个吧</div>
       </template>
     </div>
@@ -97,13 +130,31 @@ import { useDisplayUser } from '../composables/useDisplayUser'
 const videoStore = useVideoStore()
 const router = useRouter()
 const { displayUser, isAuthenticated, authStore } = useDisplayUser()
-const { myVideos, myVideosHasMore, myVideosPage, myVideosSize, loading, errorMessage } =
-  storeToRefs(videoStore)
+const {
+  myVideos,
+  myVideosPage,
+  myVideosSize,
+  myVideosTotal,
+  loading,
+  errorMessage,
+} = storeToRefs(videoStore)
 
 const current = ref<VideoItem | null>(null)
 const currentPlaySource = ref('')
 const deleting = ref(false)
+const selectedPageSize = ref(myVideosSize.value)
 
+const totalPages = computed(() => Math.max(1, Math.ceil(myVideosTotal.value / myVideosSize.value)))
+const visiblePages = computed(() => {
+  const pages: number[] = []
+  const total = totalPages.value
+  const start = Math.max(1, Math.min(myVideosPage.value - 2, total - 4))
+  const end = Math.min(total, start + 4)
+  for (let page = start; page <= end; page += 1) {
+    pages.push(page)
+  }
+  return pages
+})
 const profileName = computed(() => (isAuthenticated.value ? displayUser.value.username : '未登录'))
 const profileUid = computed(() =>
   isAuthenticated.value ? `抖音号：mini_${displayUser.value.id}` : '登录后显示抖音号',
@@ -138,22 +189,18 @@ function closePlayer() {
   currentPlaySource.value = ''
 }
 
-async function loadVideos() {
-  if (!isAuthenticated.value) return
+async function loadPage(page: number) {
+  if (!isAuthenticated.value || loading.value) return
+  const nextPage = Math.max(1, Math.min(page, totalPages.value))
   try {
-    await videoStore.loadMyVideos(1, myVideosSize.value)
+    await videoStore.loadMyVideos(nextPage, selectedPageSize.value)
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '加载作品失败')
   }
 }
 
-async function loadMore() {
-  if (!isAuthenticated.value || loading.value) return
-  try {
-    await videoStore.loadMyVideos(myVideosPage.value + 1, myVideosSize.value)
-  } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : '加载更多失败')
-  }
+function onPageSizeChange() {
+  void loadPage(1)
 }
 
 async function remove() {
@@ -167,6 +214,9 @@ async function remove() {
     deleting.value = true
     await videoStore.deleteVideo(current.value.id)
     closePlayer()
+    const nextTotal = Math.max(0, myVideosTotal.value)
+    const nextTotalPages = Math.max(1, Math.ceil(nextTotal / selectedPageSize.value))
+    await loadPage(Math.min(myVideosPage.value, nextTotalPages))
     ElMessage.success('已删除')
   } catch (error) {
     if (error instanceof Error) {
@@ -191,12 +241,12 @@ function onRegister() {
 }
 
 onMounted(() => {
-  void loadVideos()
+  void loadPage(1)
 })
 
 watch(isAuthenticated, (value) => {
   if (value) {
-    void loadVideos()
+    void loadPage(1)
   }
 })
 </script>
@@ -335,6 +385,69 @@ watch(isAuthenticated, (value) => {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
 }
 
+.pager {
+  margin: 16px;
+  padding: 12px;
+  border-radius: 8px;
+  background: rgba(55, 56, 50, 0.92);
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.page-size {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 13px;
+}
+
+.page-size select {
+  width: 58px;
+  height: 34px;
+  border: none;
+  border-radius: 6px;
+  background: #20211d;
+  color: #fff;
+  padding: 0 8px;
+  font-weight: 700;
+}
+
+.page-controls {
+  display: flex;
+  justify-content: center;
+  gap: 7px;
+}
+
+.page-controls button {
+  min-width: 38px;
+  height: 34px;
+  border-radius: 6px;
+  background: #141a12;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 0 12px;
+}
+
+.page-controls button:disabled {
+  color: rgba(255, 255, 255, 0.28);
+}
+
+.page-number.active {
+  background: #2d384a;
+  box-shadow: inset 0 0 0 1px rgba(196, 210, 255, 0.9);
+}
+
+.page-summary {
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .empty {
   text-align: center;
   padding: 60px 0;
@@ -349,8 +462,7 @@ watch(isAuthenticated, (value) => {
   gap: 14px;
 }
 
-.login-inline,
-.load-more {
+.login-inline {
   height: 34px;
   padding: 0 18px;
   border-radius: 17px;
@@ -367,11 +479,6 @@ watch(isAuthenticated, (value) => {
 .empty-actions {
   display: flex;
   gap: 10px;
-}
-
-.load-more {
-  display: block;
-  margin: 18px auto 32px;
 }
 
 .player {
@@ -427,5 +534,21 @@ watch(isAuthenticated, (value) => {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+@media (max-width: 420px) {
+  .pager {
+    grid-template-columns: 1fr;
+  }
+
+  .page-controls {
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .page-summary {
+    text-align: right;
+  }
 }
 </style>
