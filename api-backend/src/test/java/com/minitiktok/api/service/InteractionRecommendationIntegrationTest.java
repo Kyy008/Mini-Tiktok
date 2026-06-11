@@ -116,6 +116,27 @@ class InteractionRecommendationIntegrationTest {
                 videoService.getRecommendations("user-2", 10).stream().map(VideoRecommendationVO::getId).toList());
     }
 
+    @Test
+    void shouldClearOnlyCurrentUsersViewHistory() {
+        Video first = insertVideo("First", "owner", LocalDateTime.of(2026, 6, 3, 10, 0));
+        Video second = insertVideo("Second", "owner", LocalDateTime.of(2026, 6, 3, 11, 0));
+
+        interactionService.recordView("user-1", first.getId());
+        interactionService.recordView("user-1", second.getId());
+        interactionService.recordView("user-2", first.getId());
+
+        assertEquals(2, interactionService.clearViewHistory("user-1"));
+
+        assertEquals(0L, countRows("video_view", "user_id = ?", "user-1"));
+        assertEquals(1L, countRows("video_view", "user_id = ?", "user-2"));
+        assertIterableEquals(
+                List.of(second.getId(), first.getId()),
+                videoService.getRecommendations("user-1", 10).stream().map(VideoRecommendationVO::getId).toList());
+        assertIterableEquals(
+                List.of(second.getId()),
+                videoService.getRecommendations("user-2", 10).stream().map(VideoRecommendationVO::getId).toList());
+    }
+
     private Video insertVideo(String title, String uploaderId, LocalDateTime createdAt) {
         return insertVideo(title, uploaderId, createdAt, false);
     }

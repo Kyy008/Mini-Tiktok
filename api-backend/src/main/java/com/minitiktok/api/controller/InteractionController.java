@@ -80,6 +80,14 @@ public class InteractionController {
         return Result.success();
     }
 
+    // 6. 清除当前用户的推荐历史：DELETE /api/videos/views
+    @DeleteMapping("/api/videos/views")
+    public Result<Void> clearVideoViewHistory() {
+        String userId = currentUserService.getCurrentUser().userId();
+        interactionService.clearViewHistory(userId);
+        return Result.success();
+    }
+
     private VideoLikeStatusResponse likeStatus(Long videoId, String userId, boolean fallbackLiked) {
         long likeCount = interactionService.getLikeCount(videoId);
         boolean liked = userId == null || userId.isBlank()
