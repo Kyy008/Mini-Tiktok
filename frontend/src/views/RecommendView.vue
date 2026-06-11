@@ -1,9 +1,7 @@
 <template>
   <div class="recommend">
     <header class="top-tabs">
-      <span class="t">直播</span>
-      <span class="t" :class="{ on: tab === 'follow' }" @click="tab = 'follow'">关注</span>
-      <span class="t" :class="{ on: tab === 'recommend' }" @click="tab = 'recommend'">推荐</span>
+      <span class="t on">推荐</span>
       <button class="clear-history" type="button" :disabled="clearingHistory" @click="clearHistory">
         {{ clearingHistory ? '清除中...' : '清除推荐历史' }}
       </button>
@@ -66,7 +64,6 @@ const router = useRouter()
 const { feed, feedLoading, feedErrorMessage } = storeToRefs(videoStore)
 const { isAuthenticated } = storeToRefs(authStore)
 
-const tab = ref<'follow' | 'recommend'>('recommend')
 const scroller = ref<HTMLElement | null>(null)
 const activeIndex = ref(0)
 const sheetOpen = ref(false)
