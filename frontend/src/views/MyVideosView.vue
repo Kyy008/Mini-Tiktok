@@ -23,7 +23,7 @@
         <div class="stats">
           <div><b>{{ profileStats.following }}</b><span>关注</span></div>
           <div><b>{{ profileStats.followers }}</b><span>粉丝</span></div>
-          <div><b>{{ profileStats.likes }}</b><span>获赞</span></div>
+          <div><b>{{ profileStats.likes }}</b><span>本页获赞</span></div>
         </div>
       </header>
 
