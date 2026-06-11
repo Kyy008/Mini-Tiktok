@@ -3,6 +3,7 @@ import { ref } from 'vue'
 
 import type { CommentItem, PageResult, UploadProgress, VideoItem } from '../api/types'
 import {
+  clearVideoViewHistory as clearVideoViewHistoryApi,
   deleteVideo as deleteVideoApi,
   getRecommendations as fetchRecommendations,
   getMyVideos as fetchMyVideos,
@@ -109,6 +110,11 @@ export const useVideoStore = defineStore('video', () => {
     }
   }
 
+  async function clearViewHistory(): Promise<void> {
+    await clearVideoViewHistoryApi()
+    viewedVideoIds.value.clear()
+  }
+
   function loadComments(_id: number): CommentItem[] {
     return []
   }
@@ -192,6 +198,7 @@ export const useVideoStore = defineStore('video', () => {
     uploadProgress,
     toggleLike,
     markViewed,
+    clearViewHistory,
     loadComments,
     loadRecommendations,
     loadVideoDetail,

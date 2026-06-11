@@ -4,10 +4,9 @@
       <span class="t">直播</span>
       <span class="t" :class="{ on: tab === 'follow' }" @click="tab = 'follow'">关注</span>
       <span class="t" :class="{ on: tab === 'recommend' }" @click="tab = 'recommend'">推荐</span>
-      <svg class="search" viewBox="0 0 24 24" width="22" height="22" fill="none">
-        <circle cx="11" cy="11" r="7" stroke="#fff" stroke-width="2" />
-        <path d="M20 20l-3.5-3.5" stroke="#fff" stroke-width="2" stroke-linecap="round" />
-      </svg>
+      <button class="clear-history" type="button" :disabled="clearingHistory" @click="clearHistory">
+        {{ clearingHistory ? '清除中...' : '清除推荐历史' }}
+      </button>
     </header>
 
     <div v-if="feedLoading" class="state">正在加载推荐...</div>
@@ -72,6 +71,7 @@ const scroller = ref<HTMLElement | null>(null)
 const activeIndex = ref(0)
 const sheetOpen = ref(false)
 const sheetVideoId = ref<number | null>(null)
+const clearingHistory = ref(false)
 
 let observer: IntersectionObserver | null = null
 let touchStartY = 0
@@ -106,6 +106,27 @@ async function reload() {
     await syncActiveVideo()
   } catch {
     // 错误文案已经写入 feedErrorMessage。
+  }
+}
+
+async function clearHistory() {
+  if (!isAuthenticated.value) {
+    await router.push({
+      path: '/login',
+      query: { redirect: route.fullPath },
+    })
+    return
+  }
+  if (clearingHistory.value) return
+  clearingHistory.value = true
+  try {
+    await videoStore.clearViewHistory()
+    await reload()
+    ElMessage.success('推荐历史已清除')
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '清除推荐历史失败')
+  } finally {
+    clearingHistory.value = false
   }
 }
 
@@ -219,8 +240,18 @@ onBeforeUnmount(() => observer?.disconnect())
   font-weight: 700;
 }
 
-.top-tabs .search {
+.clear-history {
   margin-left: auto;
+  padding: 5px 8px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.5);
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.clear-history:disabled {
+  opacity: 0.55;
 }
 
 .feed {
