@@ -10,7 +10,7 @@
     <div v-if="feedLoading" class="state">正在加载推荐...</div>
     <div v-else-if="feedErrorMessage" class="state action-state">
       {{ feedErrorMessage }}
-      <button type="button" @click="reload">重试</button>
+      <button type="button" @click="reload()">重试</button>
     </div>
     <div v-else-if="!feed.length" class="state">暂无推荐视频</div>
 
@@ -94,15 +94,19 @@ async function onLike(id: number) {
   }
 }
 
-async function reload() {
+async function reload(options: { throwOnError?: boolean } = {}) {
   try {
     await videoStore.loadRecommendations()
     await nextTick()
     activeIndex.value = 0
+    scroller.value?.scrollTo({ top: 0, behavior: 'auto' })
     setupObserver()
     await syncActiveVideo()
-  } catch {
+  } catch (error) {
     // 错误文案已经写入 feedErrorMessage。
+    if (options.throwOnError) {
+      throw error
+    }
   }
 }
 
@@ -118,7 +122,7 @@ async function clearHistory() {
   clearingHistory.value = true
   try {
     await videoStore.clearViewHistory()
-    await reload()
+    await reload({ throwOnError: true })
     ElMessage.success('推荐历史已清除')
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '清除推荐历史失败')
