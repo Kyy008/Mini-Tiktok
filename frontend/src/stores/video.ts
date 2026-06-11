@@ -29,6 +29,10 @@ export const useVideoStore = defineStore('video', () => {
   const uploadProgress = ref<UploadProgress | null>(null)
   const viewedVideoIds = ref<Set<number>>(new Set())
 
+  interface LoadMyVideosOptions {
+    preserveOnError?: boolean
+  }
+
   function findInAll(id: number): VideoItem[] {
     return [...feed.value, ...myVideos.value].filter((v) => v.id === id)
   }
@@ -109,7 +113,11 @@ export const useVideoStore = defineStore('video', () => {
     return []
   }
 
-  async function loadMyVideos(page = 1, size = myVideosSize.value): Promise<PageResult<VideoItem>> {
+  async function loadMyVideos(
+    page = 1,
+    size = myVideosSize.value,
+    options: LoadMyVideosOptions = {},
+  ): Promise<PageResult<VideoItem>> {
     loading.value = true
     errorMessage.value = ''
     try {
@@ -121,12 +129,14 @@ export const useVideoStore = defineStore('video', () => {
       myVideosHasMore.value = result.hasMore
       return result
     } catch (error) {
-      if (page === 1) {
-        myVideos.value = []
-        myVideosTotal.value = 0
-        myVideosHasMore.value = false
+      if (!options.preserveOnError) {
+        if (page === 1) {
+          myVideos.value = []
+          myVideosTotal.value = 0
+          myVideosHasMore.value = false
+        }
+        errorMessage.value = getErrorMessage(error)
       }
-      errorMessage.value = getErrorMessage(error)
       throw error
     } finally {
       loading.value = false

@@ -214,9 +214,15 @@ async function remove() {
     deleting.value = true
     await videoStore.deleteVideo(current.value.id)
     closePlayer()
-    const nextTotal = Math.max(0, myVideosTotal.value)
-    const nextTotalPages = Math.max(1, Math.ceil(nextTotal / selectedPageSize.value))
-    await loadPage(Math.min(myVideosPage.value, nextTotalPages))
+    const nextTotalPages = Math.max(1, Math.ceil(myVideosTotal.value / selectedPageSize.value))
+    const nextPage = Math.min(myVideosPage.value, nextTotalPages)
+    try {
+      await videoStore.loadMyVideos(nextPage, selectedPageSize.value, {
+        preserveOnError: true,
+      })
+    } catch {
+      // 删除已成功，分页刷新失败时保留当前删除结果，避免把成功操作显示成失败。
+    }
     ElMessage.success('已删除')
   } catch (error) {
     if (error instanceof Error) {
