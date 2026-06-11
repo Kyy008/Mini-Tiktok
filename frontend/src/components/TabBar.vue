@@ -19,7 +19,6 @@
 
 <script setup lang="ts">
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
 
 interface Tab {
   key: string
@@ -29,9 +28,7 @@ interface Tab {
 
 const tabs: Tab[] = [
   { key: 'home', label: '首页', to: '/' },
-  { key: 'friends', label: '朋友' },
   { key: 'plus', label: '' },
-  { key: 'msg', label: '消息' },
   { key: 'me', label: '我', to: '/my/videos' },
 ]
 
@@ -46,7 +43,6 @@ function isActive(t: Tab) {
 function onTap(t: Tab) {
   if (t.key === 'plus') return router.push('/upload')
   if (t.to) return router.push(t.to)
-  ElMessage({ message: '该功能敬请期待', grouping: true })
 }
 </script>
 

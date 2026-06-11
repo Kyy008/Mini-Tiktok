@@ -209,6 +209,11 @@ export async function markVideoViewed(id: number): Promise<void> {
   ensureSuccess(response.data)
 }
 
+export async function clearVideoViewHistory(): Promise<void> {
+  const response = await apiHttp.delete<ApiResult<void>>('/api/videos/views')
+  ensureSuccess(response.data)
+}
+
 export async function likeVideo(id: number): Promise<BackendLikeStatus | null> {
   const response = await apiHttp.post<ApiResult<BackendLikeStatus | null>>(`/api/videos/${id}/likes`)
   ensureSuccess(response.data)
