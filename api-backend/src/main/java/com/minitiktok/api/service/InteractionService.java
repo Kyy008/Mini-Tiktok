@@ -67,4 +67,11 @@ public class InteractionService {
             // 重复看同一视频不重复插入，静默处理
         }
     }
+
+    @Transactional
+    public int clearViewHistory(String userId) {
+        LambdaQueryWrapper<VideoView> query = new LambdaQueryWrapper<VideoView>()
+                .eq(VideoView::getUserId, userId);
+        return videoViewMapper.delete(query);
+    }
 }

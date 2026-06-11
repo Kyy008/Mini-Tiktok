@@ -129,6 +129,24 @@ class InteractionControllerTest {
     }
 
     @Test
+    void shouldRejectClearingViewHistoryWithoutToken() throws Exception {
+        mockMvc.perform(delete("/api/videos/views"))
+                .andExpect(status().isUnauthorized());
+
+        verify(interactionService, never()).clearViewHistory(eq("user-1"));
+    }
+
+    @Test
+    void shouldClearViewHistoryWhenUserHasVideoReadScope() throws Exception {
+        mockMvc.perform(delete("/api/videos/views")
+                        .with(readJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200));
+
+        verify(interactionService).clearViewHistory("user-1");
+    }
+
+    @Test
     void shouldReturnNotFoundWhenRecordingViewForMissingVideo() throws Exception {
         when(videoService.findActiveById(404L)).thenReturn(Optional.empty());
 

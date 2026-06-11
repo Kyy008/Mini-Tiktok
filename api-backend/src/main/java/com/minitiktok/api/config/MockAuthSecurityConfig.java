@@ -50,6 +50,7 @@ public class MockAuthSecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/video-uploads/**").hasAuthority("SCOPE_video:write")
                         .requestMatchers(HttpMethod.POST, "/api/video-uploads/*/complete").hasAuthority("SCOPE_video:write")
                         .requestMatchers(HttpMethod.POST, "/api/videos/*/views").hasAuthority("SCOPE_video:read")
+                        .requestMatchers(HttpMethod.DELETE, "/api/videos/views").hasAuthority("SCOPE_video:read")
                         .requestMatchers(HttpMethod.POST, "/api/videos/*/likes").hasAuthority("SCOPE_video:like")
                         .requestMatchers(HttpMethod.DELETE, "/api/videos/*/likes").hasAuthority("SCOPE_video:like")
                         .requestMatchers(HttpMethod.GET, "/api/videos/**").hasAuthority("SCOPE_video:read")

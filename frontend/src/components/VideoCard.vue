@@ -5,6 +5,8 @@
       class="video"
       :src="playSource"
       :poster="video.coverUrl"
+      autoplay
+      muted
       loop
       playsinline
       webkit-playsinline
@@ -48,7 +50,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import type { VideoItem } from '../api/types'
 import { resolveVideoPlaySource } from '../api/video'
 import ActionRail from './ActionRail.vue'
@@ -65,15 +67,7 @@ const playSource = ref(props.video.playUrl)
 watch(
   () => props.active,
   (a) => {
-    const el = videoEl.value
-    if (!el) return
-    if (a) {
-      el.currentTime = 0
-      el.play().then(() => (playing.value = true)).catch(() => (playing.value = false))
-    } else {
-      el.pause()
-      playing.value = false
-    }
+    void syncPlayback(a)
   },
 )
 
@@ -89,8 +83,14 @@ function togglePlay() {
   const el = videoEl.value
   if (!el) return
   if (el.paused) {
-    el.play()
-    playing.value = true
+    el.muted = false
+    void el.play()
+      .then(() => {
+        playing.value = true
+      })
+      .catch(() => {
+        playing.value = false
+      })
   } else {
     el.pause()
     playing.value = false
@@ -111,6 +111,31 @@ function onDouble(e: MouseEvent) {
 async function loadPlaySource() {
   playSource.value = resolveVideoPlaySource(props.video)
 }
+
+async function syncPlayback(active: boolean) {
+  const el = videoEl.value
+  if (!el) return
+  if (!active) {
+    el.pause()
+    playing.value = false
+    return
+  }
+
+  el.currentTime = 0
+  el.muted = true
+  try {
+    await el.play()
+    playing.value = true
+  } catch {
+    playing.value = false
+  }
+}
+
+onMounted(() => {
+  if (props.active) {
+    void syncPlayback(true)
+  }
+})
 </script>
 
 <style scoped>
