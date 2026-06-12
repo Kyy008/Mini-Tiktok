@@ -1,3 +1,5 @@
+name: mini-tiktok-prod
+
 services:
   mysql:
     image: mysql:8.4
@@ -89,5 +91,8 @@ services:
 
 volumes:
   mini_tiktok_prod_mysql_data:
+    name: mini_tiktok_prod_mysql_data
   mini_tiktok_prod_video_data:
+    name: mini_tiktok_prod_video_data
   mini_tiktok_prod_upload_data:
+    name: mini_tiktok_prod_upload_data
