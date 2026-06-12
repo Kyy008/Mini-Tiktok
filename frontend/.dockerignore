@@ -1,0 +1,12 @@
+node_modules
+dist
+build
+coverage
+.npm
+.pnpm-store
+.yarn
+*.log
+.env
+.env.*
+!.env.example
+Dockerfile

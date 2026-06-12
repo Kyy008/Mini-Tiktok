@@ -1,0 +1,9 @@
+target
+build
+out
+.gradle
+logs
+*.log
+.env
+.env.*
+Dockerfile

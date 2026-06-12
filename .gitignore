@@ -8,5 +8,9 @@ frontend/node_modules/
 
 # Local test runner overrides
 auth-backend/src/test/resources/mockito-extensions/
+.env
+.env.*
+!.env.example
+!.env.prod.example
 .trae/
 /.idea

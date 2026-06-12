@@ -59,9 +59,10 @@ public class AuthorizationServerConfig {
     }
 
     @Bean
-    AuthorizationServerSettings authorizationServerSettings() {
+    AuthorizationServerSettings authorizationServerSettings(
+            @Value("${app.oauth2.issuer:http://localhost:9000}") String issuer) {
         return AuthorizationServerSettings.builder()
-                .issuer("http://localhost:9000")
+                .issuer(issuer)
                 .build();
     }
 
@@ -96,30 +97,55 @@ public class AuthorizationServerConfig {
     @Bean
     ApplicationRunner tiktokWebClientSeeder(
             RegisteredClientRepository registeredClientRepository,
+            JdbcTemplate jdbcTemplate,
+            @Value("${app.oauth2.client.redirect-uri:http://localhost:5173/oauth/callback}") String redirectUri,
             @Value("${app.oauth2.seed-client:true}") boolean seedClient) {
         return args -> {
             if (!seedClient) {
                 return;
             }
-            seedTiktokWebClient(registeredClientRepository);
+            seedTiktokWebClient(registeredClientRepository, jdbcTemplate, redirectUri);
         };
     }
 
     @Transactional
-    void seedTiktokWebClient(RegisteredClientRepository registeredClientRepository) {
-        if (registeredClientRepository.findByClientId("tiktok-web") != null) {
+    void seedTiktokWebClient(
+            RegisteredClientRepository registeredClientRepository,
+            JdbcTemplate jdbcTemplate,
+            String redirectUri) {
+        RegisteredClient existingClient = registeredClientRepository.findByClientId("tiktok-web");
+        if (existingClient != null && existingClient.getRedirectUris().contains(redirectUri)) {
             return;
         }
-        registeredClientRepository.save(tiktokWebClient());
+        if (existingClient != null) {
+            deleteTiktokWebClient(jdbcTemplate);
+        }
+        registeredClientRepository.save(tiktokWebClient(redirectUri));
     }
 
-    private RegisteredClient tiktokWebClient() {
+    private void deleteTiktokWebClient(JdbcTemplate jdbcTemplate) {
+        jdbcTemplate.update("""
+                delete from oauth2_authorization_consent
+                where registered_client_id in (
+                    select id from oauth2_registered_client where client_id = ?
+                )
+                """, "tiktok-web");
+        jdbcTemplate.update("""
+                delete from oauth2_authorization
+                where registered_client_id in (
+                    select id from oauth2_registered_client where client_id = ?
+                )
+                """, "tiktok-web");
+        jdbcTemplate.update("delete from oauth2_registered_client where client_id = ?", "tiktok-web");
+    }
+
+    private RegisteredClient tiktokWebClient(String redirectUri) {
         return RegisteredClient.withId("tiktok-web")
                 .clientId("tiktok-web")
                 .clientName("Mini-Tiktok Web")
                 .clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-                .redirectUri("http://localhost:5173/oauth/callback")
+                .redirectUri(redirectUri)
                 .scope("video:read")
                 .scope("video:write")
                 .scope("video:like")
