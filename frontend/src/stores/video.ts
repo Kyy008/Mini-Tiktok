@@ -33,6 +33,7 @@ export const useVideoStore = defineStore('video', () => {
   const feedErrorMessage = ref('')
   const uploadProgress = ref<UploadProgress | null>(null)
   const viewedVideoIds = ref<Set<number>>(new Set())
+  const recommendationsStale = ref(false)
 
   interface LoadMyVideosOptions {
     preserveOnError?: boolean
@@ -58,6 +59,7 @@ export const useVideoStore = defineStore('video', () => {
     try {
       const videos = await fetchRecommendations(size)
       feed.value = videos
+      recommendationsStale.value = false
       return videos
     } catch (error) {
       feed.value = []
@@ -173,6 +175,7 @@ export const useVideoStore = defineStore('video', () => {
       const item = await uploadVideoApi(file, title, (progress) => {
         uploadProgress.value = progress
       })
+      invalidateRecommendations()
       myVideos.value.unshift(item)
       myVideosTotal.value += 1
       return item
@@ -184,6 +187,10 @@ export const useVideoStore = defineStore('video', () => {
     }
   }
 
+  function clearUploadProgress(): void {
+    uploadProgress.value = null
+  }
+
   async function deleteVideo(id: number): Promise<void> {
     loading.value = true
     errorMessage.value = ''
@@ -191,6 +198,7 @@ export const useVideoStore = defineStore('video', () => {
       await deleteVideoApi(id)
       myVideos.value = myVideos.value.filter((v) => v.id !== id)
       feed.value = feed.value.filter((v) => v.id !== id)
+      invalidateRecommendations()
       myVideosTotal.value = Math.max(0, myVideosTotal.value - 1)
     } catch (error) {
       errorMessage.value = getErrorMessage(error)
@@ -198,6 +206,10 @@ export const useVideoStore = defineStore('video', () => {
     } finally {
       loading.value = false
     }
+  }
+
+  function invalidateRecommendations(): void {
+    recommendationsStale.value = true
   }
 
   return {
@@ -212,6 +224,9 @@ export const useVideoStore = defineStore('video', () => {
     errorMessage,
     feedErrorMessage,
     uploadProgress,
+    recommendationsStale,
+    clearUploadProgress,
+    invalidateRecommendations,
     toggleLike,
     markViewed,
     clearViewHistory,

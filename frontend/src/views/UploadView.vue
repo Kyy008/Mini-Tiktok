@@ -113,6 +113,7 @@ function resetForm() {
   revokePreviewUrl()
   file.value = null
   title.value = ''
+  videoStore.clearUploadProgress()
   resetFileInput()
 }
 
@@ -129,7 +130,10 @@ function revokePreviewUrl() {
   }
 }
 
-onBeforeUnmount(revokePreviewUrl)
+onBeforeUnmount(() => {
+  revokePreviewUrl()
+  videoStore.clearUploadProgress()
+})
 </script>
 
 <style scoped>

@@ -56,7 +56,7 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { nextTick, onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
@@ -73,7 +73,7 @@ const authStore = useAuthStore()
 const requestLogStore = useRequestLogStore()
 const route = useRoute()
 const router = useRouter()
-const { feed, feedLoading, feedErrorMessage } = storeToRefs(videoStore)
+const { feed, feedLoading, feedErrorMessage, recommendationsStale } = storeToRefs(videoStore)
 const { isAuthenticated } = storeToRefs(authStore)
 const { consoleOpen } = storeToRefs(requestLogStore)
 
@@ -226,6 +226,14 @@ function onTouchEnd(event: TouchEvent) {
 }
 
 onMounted(reload)
+
+onActivated(() => {
+  if (recommendationsStale.value) {
+    void reload()
+    return
+  }
+  setupObserver()
+})
 
 watch(activeIndex, () => {
   void syncActiveVideo()
