@@ -96,10 +96,9 @@ SERVER_HOST=39.102.59.66
 SERVER_USER=kyy008
 SERVER_PORT=22
 SERVER_SSH_KEY=用于登录服务器的 SSH 私钥
-GHCR_PAT=用于服务器拉取 GHCR 镜像的 GitHub Token
 ```
 
-`GHCR_PAT` 至少需要 `read:packages` 权限。工作流本身推送 GHCR 镜像使用仓库自带的 `GITHUB_TOKEN`。
+工作流使用 GitHub Actions 内置的 `GITHUB_TOKEN` 推送镜像，并在部署步骤中临时登录 GHCR 拉取镜像，不需要额外配置 GHCR PAT。
 
 每次 push 到 `main` 后，工作流会：
 
