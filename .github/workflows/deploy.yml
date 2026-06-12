@@ -116,6 +116,13 @@ jobs:
           ln -sfn "$DEPLOY_PATH/.env.prod" .env.prod
 
           docker compose --env-file .env.prod -f docker-compose.release.yml build
+          docker rm -f \
+            mini-tiktok-prod-nginx \
+            mini-tiktok-prod-frontend \
+            mini-tiktok-prod-api \
+            mini-tiktok-prod-auth \
+            mini-tiktok-prod-mysql \
+            2>/dev/null || true
           docker compose --env-file .env.prod -f docker-compose.release.yml up -d --remove-orphans
 
           ln -sfn "$DEPLOY_PATH/releases/$RELEASE_NAME" "$DEPLOY_PATH/current"
