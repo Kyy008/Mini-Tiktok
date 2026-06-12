@@ -45,7 +45,7 @@ public class MockAuthSecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/videos/*").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/videos/*/play").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/videos/*/comments").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/request-logs").hasAuthority("SCOPE_video:read")
+                        .requestMatchers(HttpMethod.GET, "/api/request-logs").permitAll()
                         .requestMatchers(HttpMethod.DELETE, "/api/request-logs").hasAuthority("SCOPE_video:read")
                         .requestMatchers(HttpMethod.GET, "/api/my/videos").hasAuthority("SCOPE_video:read")
                         .requestMatchers(HttpMethod.POST, "/api/video-uploads/init").hasAuthority("SCOPE_video:write")

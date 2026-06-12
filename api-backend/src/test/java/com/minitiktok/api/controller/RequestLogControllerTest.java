@@ -32,17 +32,25 @@ class RequestLogControllerTest {
     }
 
     @Test
-    void shouldRejectRequestLogsWithoutToken() throws Exception {
+    void shouldReturnRequestLogsWithoutToken() throws Exception {
+        insertLog(1L, "GET", "/api/videos/recommendations", 200, 11L);
+
         mockMvc.perform(get("/api/request-logs"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value(1));
     }
 
     @Test
-    void shouldRejectRequestLogsWithoutVideoReadScope() throws Exception {
+    void shouldReturnRequestLogsWithoutVideoReadScope() throws Exception {
+        insertLog(1L, "GET", "/api/videos/recommendations", 200, 11L);
+
         mockMvc.perform(get("/api/request-logs")
                         .with(jwt().authorities(() -> "SCOPE_video:like")
                                 .jwt(jwt -> jwt.subject("user-1").claim("scope", "video:like"))))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1));
     }
 
     @Test
@@ -68,11 +76,24 @@ class RequestLogControllerTest {
     @Test
     void shouldRejectLimitBelowOne() throws Exception {
         mockMvc.perform(get("/api/request-logs")
-                        .param("limit", "0")
-                        .with(readJwt()))
+                        .param("limit", "0"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400))
                 .andExpect(jsonPath("$.message").value("Log limit must be greater than or equal to 1"));
+    }
+
+    @Test
+    void shouldRejectClearingRequestLogsWithoutToken() throws Exception {
+        mockMvc.perform(delete("/api/request-logs"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldRejectClearingRequestLogsWithoutVideoReadScope() throws Exception {
+        mockMvc.perform(delete("/api/request-logs")
+                        .with(jwt().authorities(() -> "SCOPE_video:like")
+                                .jwt(jwt -> jwt.subject("user-1").claim("scope", "video:like"))))
+                .andExpect(status().isForbidden());
     }
 
     @Test
