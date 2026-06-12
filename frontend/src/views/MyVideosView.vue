@@ -241,11 +241,11 @@ function onLogout() {
 }
 
 function onLogin() {
-  router.push('/login')
+  router.push('/auth/login')
 }
 
 function onRegister() {
-  router.push('/register')
+  router.push('/auth/register')
 }
 
 onMounted(() => {

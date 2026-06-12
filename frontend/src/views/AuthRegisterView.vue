@@ -52,7 +52,7 @@ async function submit() {
 
 function goLogin() {
   router.push({
-    path: '/login',
+    path: '/auth/login',
     query: redirectPath.value ? { redirect: redirectPath.value } : undefined,
   })
 }

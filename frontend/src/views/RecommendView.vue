@@ -95,7 +95,7 @@ function openComments(id: number) {
 async function onLike(id: number) {
   if (!isAuthenticated.value) {
     await router.push({
-      path: '/login',
+      path: '/auth/login',
       query: { redirect: route.fullPath },
     })
     return
@@ -128,7 +128,7 @@ async function reload(options: { throwOnError?: boolean } = {}) {
 async function clearHistory() {
   if (!isAuthenticated.value) {
     await router.push({
-      path: '/login',
+      path: '/auth/login',
       query: { redirect: route.fullPath },
     })
     return
