@@ -78,8 +78,8 @@ PUBLIC_ORIGIN=https://你的域名
 
 ## GitHub Actions CI/CD
 
-CI/CD 采用服务器本地构建模式：GitHub Actions 打包源码上传到服务器，服务器使用
-`docker-compose.prod.yml` 构建镜像并启动容器。
+CI/CD 采用混合部署模式：GitHub Actions 先构建前端 `dist` 和后端 `jar`，再把源码与构建产物上传到服务器，服务器使用
+`docker-compose.release.yml` 打包轻量运行镜像并启动容器。
 
 服务器固定部署目录：
 
@@ -99,10 +99,11 @@ SERVER_SSH_KEY=用于登录服务器的 SSH 私钥
 每次 push 到 `main` 后，工作流会：
 
 ```text
-打包仓库源码为 release.tgz
+在 GitHub Actions 构建 frontend dist、api-backend jar、auth-backend jar
+打包源码与构建产物为 release.tgz
 上传到 /home/kyy008/projects/tiktok/releases/<commit>
 软链服务器上的 /home/kyy008/projects/tiktok/.env.prod
-在服务器执行 docker compose --env-file .env.prod -f docker-compose.prod.yml build
-在服务器执行 docker compose --env-file .env.prod -f docker-compose.prod.yml up -d
+在服务器执行 docker compose --env-file .env.prod -f docker-compose.release.yml build
+在服务器执行 docker compose --env-file .env.prod -f docker-compose.release.yml up -d
 保留最近 5 个 release 目录
 ```
