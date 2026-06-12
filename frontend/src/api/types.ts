@@ -40,9 +40,9 @@ export interface VideoItem {
 
 export interface CommentItem {
   id: number
+  videoId: number
   user: UserInfo
   content: string
-  likeCount: number
   createdAt: string
 }
 

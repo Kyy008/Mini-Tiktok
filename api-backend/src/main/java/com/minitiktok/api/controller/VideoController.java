@@ -11,6 +11,7 @@ import com.minitiktok.api.exception.VideoNotFoundException;
 import com.minitiktok.api.security.CurrentUserService;
 import com.minitiktok.api.security.CurrentUser;
 import com.minitiktok.api.service.InteractionService;
+import com.minitiktok.api.service.VideoCommentService;
 import com.minitiktok.api.service.VideoService;
 import com.minitiktok.api.storage.StoredVideoFile;
 import com.minitiktok.api.storage.VideoStorageService;
@@ -46,17 +47,19 @@ public class VideoController {
     private final VideoStorageService videoStorageService;
     private final VideoService videoService;
     private final InteractionService interactionService;
+    private final VideoCommentService videoCommentService;
 
     @GetMapping("/api/videos/{id}")
     public Result<VideoDetailResponse> getVideoDetail(@PathVariable("id") Long id) {
         Video video = videoService.findActiveById(id)
                 .orElseThrow(VideoNotFoundException::new);
         long likeCount = interactionService.getLikeCount(id);
+        long commentCount = videoCommentService.countByVideoId(id);
         Optional<CurrentUser> currentUser = currentUserService.findCurrentUser();
         boolean liked = currentUser
                 .map(user -> interactionService.isLikedByUser(user.userId(), id))
                 .orElse(false);
-        return Result.success(toVideoDetailResponse(video, likeCount, liked));
+        return Result.success(toVideoDetailResponse(video, likeCount, commentCount, liked));
     }
 
     @GetMapping("/api/videos/{id}/play")
@@ -147,7 +150,7 @@ public class VideoController {
         }
     }
 
-    private VideoDetailResponse toVideoDetailResponse(Video video, long likeCount, boolean liked) {
+    private VideoDetailResponse toVideoDetailResponse(Video video, long likeCount, long commentCount, boolean liked) {
         return new VideoDetailResponse(
                 video.getId(),
                 video.getTitle(),
@@ -155,6 +158,7 @@ public class VideoController {
                 video.getCreatedAt(),
                 video.getUploaderId(),
                 likeCount,
+                commentCount,
                 liked);
     }
 
@@ -164,7 +168,8 @@ public class VideoController {
                 video.getTitle(),
                 "/api/videos/" + video.getId() + "/play",
                 video.getCreatedAt(),
-                interactionService.getLikeCount(video.getId()));
+                interactionService.getLikeCount(video.getId()),
+                videoCommentService.countByVideoId(video.getId()));
     }
 
     private ResponseEntity<?> buildPlayResponse(Resource resource, HttpHeaders requestHeaders) {

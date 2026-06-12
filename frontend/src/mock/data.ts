@@ -74,6 +74,7 @@ export const MOCK_MY_VIDEOS: VideoItem[] = Array.from({ length: 9 }, (_, i) => (
 export function mockComments(videoId: number): CommentItem[] {
   return Array.from({ length: 8 }, (_, i) => ({
     id: videoId * 100 + i,
+    videoId,
     user: AUTHORS[i % AUTHORS.length],
     content: [
       '哈哈哈太好笑了',
@@ -85,7 +86,6 @@ export function mockComments(videoId: number): CommentItem[] {
       '画质好顶呀',
       '第一次抢到沙发 🛋️',
     ][i],
-    likeCount: (i + 1) * 12,
     createdAt: `${i + 1} 小时前`,
   }))
 }

@@ -17,6 +17,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.minitiktok.api.entity.Video;
 import com.minitiktok.api.security.CurrentUserService;
 import com.minitiktok.api.service.InteractionService;
+import com.minitiktok.api.service.VideoCommentService;
 import com.minitiktok.api.service.VideoService;
 import com.minitiktok.api.storage.StoredVideoFile;
 import com.minitiktok.api.storage.VideoStorageService;
@@ -54,6 +55,9 @@ class MockAuthModeVideoControllerTest {
     @MockBean
     private InteractionService interactionService;
 
+    @MockBean
+    private VideoCommentService videoCommentService;
+
     @Test
     void shouldReturnVideoDetailWhenUsingMockVideoReadToken() throws Exception {
         when(videoService.findActiveById(1L)).thenReturn(Optional.of(Video.builder()
@@ -65,6 +69,7 @@ class MockAuthModeVideoControllerTest {
                 .createdAt(LocalDateTime.of(2026, 5, 20, 12, 0))
                 .build()));
         when(interactionService.getLikeCount(1L)).thenReturn(2L);
+        when(videoCommentService.countByVideoId(1L)).thenReturn(3L);
         when(interactionService.isLikedByUser("local-reader", 1L)).thenReturn(false);
 
         mockMvc.perform(get("/api/videos/1")
@@ -76,6 +81,7 @@ class MockAuthModeVideoControllerTest {
                 .andExpect(jsonPath("$.data.playUrl").value("/api/videos/1/play"))
                 .andExpect(jsonPath("$.data.uploaderId").value("local-uploader"))
                 .andExpect(jsonPath("$.data.likeCount").value(2))
+                .andExpect(jsonPath("$.data.commentCount").value(3))
                 .andExpect(jsonPath("$.data.liked").value(false));
     }
 

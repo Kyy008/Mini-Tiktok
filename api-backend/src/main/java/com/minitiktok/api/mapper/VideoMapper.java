@@ -24,6 +24,7 @@ public interface VideoMapper extends BaseMapper<Video> {
     @Select("<script>" +
             "SELECT v.id, v.title, v.created_at AS createdAt, " +
             "       (SELECT COUNT(*) FROM video_like WHERE video_id = v.id) AS likeCount, " +
+            "       (SELECT COUNT(*) FROM video_comment WHERE video_id = v.id) AS commentCount, " +
             "       CASE WHEN (SELECT COUNT(*) FROM video_like WHERE video_id = v.id AND user_id = #{userId}) > 0 THEN 1 ELSE 0 END AS liked, " +
             "       CONCAT('/api/videos/', v.id, '/play') AS playUrl " +
             "FROM video v " +

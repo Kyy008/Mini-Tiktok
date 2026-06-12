@@ -13,6 +13,7 @@ public class VideoRecommendationVO {
     private Long id;
     private String title;
     private Long likeCount;
+    private Long commentCount;
     private Boolean liked;
     private String playUrl;
     private LocalDateTime createdAt;

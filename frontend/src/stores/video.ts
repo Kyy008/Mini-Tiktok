@@ -3,6 +3,10 @@ import { ref } from 'vue'
 
 import type { CommentItem, PageResult, UploadProgress, VideoItem } from '../api/types'
 import {
+  createVideoComment as createVideoCommentApi,
+  getVideoComments as fetchVideoComments,
+} from '../api/comment'
+import {
   clearVideoViewHistory as clearVideoViewHistoryApi,
   deleteVideo as deleteVideoApi,
   getRecommendations as fetchRecommendations,
@@ -41,6 +45,11 @@ export const useVideoStore = defineStore('video', () => {
   function replaceVideo(video: VideoItem): void {
     replaceInList(feed, video)
     replaceInList(myVideos, video)
+  }
+
+  function setCommentCount(id: number, count: number): void {
+    setCommentCountInList(feed, id, count)
+    setCommentCountInList(myVideos, id, count)
   }
 
   async function loadRecommendations(size = 10): Promise<VideoItem[]> {
@@ -115,8 +124,15 @@ export const useVideoStore = defineStore('video', () => {
     viewedVideoIds.value.clear()
   }
 
-  function loadComments(_id: number): CommentItem[] {
-    return []
+  async function loadComments(id: number): Promise<CommentItem[]> {
+    const comments = await fetchVideoComments(id)
+    setCommentCount(id, comments.length)
+    return comments
+  }
+
+  async function createComment(id: number, content: string): Promise<CommentItem[]> {
+    await createVideoCommentApi(id, content)
+    return loadComments(id)
   }
 
   async function loadMyVideos(
@@ -200,6 +216,7 @@ export const useVideoStore = defineStore('video', () => {
     markViewed,
     clearViewHistory,
     loadComments,
+    createComment,
     loadRecommendations,
     loadVideoDetail,
     refreshLikeStatus,
@@ -213,6 +230,14 @@ function replaceInList(list: { value: VideoItem[] }, video: VideoItem): void {
   const index = list.value.findIndex((item) => item.id === video.id)
   if (index !== -1) {
     list.value[index] = video
+  }
+}
+
+function setCommentCountInList(list: { value: VideoItem[] }, id: number, count: number): void {
+  for (const video of list.value) {
+    if (video.id === id) {
+      video.commentCount = count
+    }
   }
 }
 

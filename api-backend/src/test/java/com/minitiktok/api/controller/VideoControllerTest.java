@@ -20,6 +20,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.minitiktok.api.entity.Video;
 import com.minitiktok.api.security.CurrentUserService;
 import com.minitiktok.api.service.InteractionService;
+import com.minitiktok.api.service.VideoCommentService;
 import com.minitiktok.api.service.VideoService;
 import com.minitiktok.api.storage.StoredVideoFile;
 import com.minitiktok.api.storage.VideoStorageService;
@@ -56,6 +57,9 @@ class VideoControllerTest {
     @MockBean
     private InteractionService interactionService;
 
+    @MockBean
+    private VideoCommentService videoCommentService;
+
     @Test
     void shouldReturnVideoDetailWhenUserHasVideoReadScope() throws Exception {
         when(videoService.findActiveById(1L)).thenReturn(Optional.of(Video.builder()
@@ -67,6 +71,7 @@ class VideoControllerTest {
                 .createdAt(LocalDateTime.of(2026, 5, 20, 12, 0))
                 .build()));
         when(interactionService.getLikeCount(1L)).thenReturn(4L);
+        when(videoCommentService.countByVideoId(1L)).thenReturn(6L);
         when(interactionService.isLikedByUser("1", 1L)).thenReturn(true);
 
         mockMvc.perform(get("/api/videos/1")
@@ -84,6 +89,7 @@ class VideoControllerTest {
                 .andExpect(jsonPath("$.data.createdAt").value("2026-05-20T12:00:00"))
                 .andExpect(jsonPath("$.data.uploaderId").value("uploader-1"))
                 .andExpect(jsonPath("$.data.likeCount").value(4))
+                .andExpect(jsonPath("$.data.commentCount").value(6))
                 .andExpect(jsonPath("$.data.liked").value(true));
     }
 
@@ -98,11 +104,13 @@ class VideoControllerTest {
                 .createdAt(LocalDateTime.of(2026, 5, 20, 12, 0))
                 .build()));
         when(interactionService.getLikeCount(1L)).thenReturn(4L);
+        when(videoCommentService.countByVideoId(1L)).thenReturn(1L);
 
         mockMvc.perform(get("/api/videos/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.id").value(1))
                 .andExpect(jsonPath("$.data.likeCount").value(4))
+                .andExpect(jsonPath("$.data.commentCount").value(1))
                 .andExpect(jsonPath("$.data.liked").value(false));
 
         verify(interactionService, never()).isLikedByUser(any(), eq(1L));
