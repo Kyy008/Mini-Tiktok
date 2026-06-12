@@ -1,0 +1,100 @@
+name: Deploy Mini-Tiktok
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_OWNER: kyy008
+  PUBLIC_ORIGIN: ${{ vars.PUBLIC_ORIGIN || 'http://tiktok.kyy008.me' }}
+  DEPLOY_PATH: /home/kyy008/projects/tiktok
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/mini-tiktok-frontend:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/mini-tiktok-frontend:${{ github.sha }}
+          build-args: |
+            VITE_AUTH_BASE_URL=${{ env.PUBLIC_ORIGIN }}
+            VITE_API_BASE_URL=${{ env.PUBLIC_ORIGIN }}
+            VITE_CLIENT_ID=tiktok-web
+            VITE_REDIRECT_URI=${{ env.PUBLIC_ORIGIN }}/oauth/callback
+            VITE_SCOPE=video:read video:write video:like
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+
+      - name: Build and push auth backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./auth-backend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/mini-tiktok-auth-backend:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/mini-tiktok-auth-backend:${{ github.sha }}
+          cache-from: type=gha,scope=auth-backend
+          cache-to: type=gha,mode=max,scope=auth-backend
+
+      - name: Build and push API backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./api-backend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/mini-tiktok-api-backend:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/mini-tiktok-api-backend:${{ github.sha }}
+          cache-from: type=gha,scope=api-backend
+          cache-to: type=gha,mode=max,scope=api-backend
+
+      - name: Upload deploy files
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          source: "docker-compose.deploy.yml,docker/nginx/default.conf,docker/mysql/init/01-create-databases.sql"
+          target: ${{ env.DEPLOY_PATH }}
+
+      - name: Deploy on server
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          script: |
+            set -e
+            cd /home/kyy008/projects/tiktok
+            test -f .env.prod
+            echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u kyy008 --password-stdin
+            docker compose --env-file .env.prod -f docker-compose.deploy.yml pull
+            docker compose --env-file .env.prod -f docker-compose.deploy.yml up -d --remove-orphans
+            docker image prune -f

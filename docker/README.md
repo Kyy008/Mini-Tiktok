@@ -75,3 +75,37 @@ PUBLIC_ORIGIN=https://你的域名
 ```
 
 生产环境 MySQL 默认不暴露到公网，只供容器内部访问。视频文件和上传临时文件分别通过 Docker volume 持久化保存。
+
+## GitHub Actions CI/CD
+
+仓库提供两个部署入口：
+
+- `docker-compose.prod.yml`：本地或服务器手动构建镜像并启动。
+- `docker-compose.deploy.yml`：CI/CD 使用 GHCR 镜像启动，不在服务器上构建。
+
+服务器固定部署目录：
+
+```text
+/home/kyy008/projects/tiktok
+```
+
+GitHub Actions 需要配置以下 Repository Secrets：
+
+```text
+SERVER_HOST=39.102.59.66
+SERVER_USER=kyy008
+SERVER_PORT=22
+SERVER_SSH_KEY=用于登录服务器的 SSH 私钥
+GHCR_PAT=用于服务器拉取 GHCR 镜像的 GitHub Token
+```
+
+`GHCR_PAT` 至少需要 `read:packages` 权限。工作流本身推送 GHCR 镜像使用仓库自带的 `GITHUB_TOKEN`。
+
+每次 push 到 `main` 后，工作流会：
+
+```text
+构建 frontend/api-backend/auth-backend 镜像
+推送到 ghcr.io/kyy008
+同步 docker-compose.deploy.yml、Nginx 配置、MySQL 初始化 SQL 到服务器
+在服务器执行 docker compose pull && docker compose up -d
+```
