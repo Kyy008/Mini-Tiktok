@@ -17,7 +17,7 @@ env:
   SERVER_HOST: ${{ secrets.SERVER_HOST }}
   SERVER_USER: ${{ secrets.SERVER_USER }}
   SERVER_PORT: ${{ secrets.SERVER_PORT || '22' }}
-  PUBLIC_ORIGIN: ${{ vars.PUBLIC_ORIGIN || 'http://tiktok.kyy008.me' }}
+  PUBLIC_ORIGIN: ${{ vars.PUBLIC_ORIGIN || 'https://tiktok.kyy008.me' }}
   DEPLOY_PATH: /home/kyy008/projects/tiktok
   RELEASE_NAME: ${{ github.sha }}
 
