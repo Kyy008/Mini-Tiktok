@@ -1,3 +1,5 @@
+import { sha256Bytes } from './sha256'
+
 const PKCE_CHARSET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~'
 
 export interface PkceParams {
@@ -16,14 +18,17 @@ export async function createPkceParams(): Promise<PkceParams> {
 }
 
 export async function createCodeChallenge(codeVerifier: string): Promise<string> {
-  const input = new TextEncoder().encode(codeVerifier)
-  const digest = await crypto.subtle.digest('SHA-256', input)
-  return base64UrlEncode(new Uint8Array(digest))
+  const digest = await sha256Bytes(codeVerifier)
+  return base64UrlEncode(digest)
 }
 
 function randomPkceString(length: number): string {
   const bytes = new Uint8Array(length)
-  crypto.getRandomValues(bytes)
+  const cryptoApi = globalThis.crypto
+  if (!cryptoApi?.getRandomValues) {
+    throw new Error('当前浏览器不支持安全随机数，无法发起登录')
+  }
+  cryptoApi.getRandomValues(bytes)
   return Array.from(bytes, (byte) => PKCE_CHARSET[byte % PKCE_CHARSET.length]).join('')
 }
 

@@ -1,4 +1,5 @@
 import { apiHttp } from '../utils/http'
+import { sha256Hex as digestSha256Hex } from '../utils/sha256'
 import type { ApiResult, PageResult, UploadProgress, VideoItem } from './types'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8085'
@@ -286,10 +287,7 @@ function emitUploadProgress(
 
 async function sha256Hex(file: File): Promise<string> {
   const buffer = await file.arrayBuffer()
-  const digest = await crypto.subtle.digest('SHA-256', buffer)
-  return [...new Uint8Array(digest)]
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('')
+  return digestSha256Hex(buffer)
 }
 
 function unwrapResult<T>(result: ApiResult<T>): T {
