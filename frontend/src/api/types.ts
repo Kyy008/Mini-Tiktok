@@ -63,3 +63,16 @@ export interface UploadProgress {
   percent: number
   status: string
 }
+
+export interface RequestLogItem {
+  id: number
+  userId: string | null
+  method: string
+  path: string
+  requestBody: string | null
+  responseBody: string | null
+  statusCode: number
+  durationMs: number
+  ip: string | null
+  createdAt: string
+}

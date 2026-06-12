@@ -58,6 +58,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/videos/recommendations").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/videos/*").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/videos/*/play").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/request-logs").hasAuthority("SCOPE_video:read")
+                        .requestMatchers(HttpMethod.DELETE, "/api/request-logs").hasAuthority("SCOPE_video:read")
                         .requestMatchers(HttpMethod.GET, "/api/my/videos").hasAuthority("SCOPE_video:read")
                         .requestMatchers(HttpMethod.POST, "/api/video-uploads/init").hasAuthority("SCOPE_video:write")
                         .requestMatchers(HttpMethod.GET, "/api/video-uploads/**").hasAuthority("SCOPE_video:write")

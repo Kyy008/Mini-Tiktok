@@ -120,8 +120,10 @@ import type { VideoItem } from '../api/types'
 import { resolveVideoPlaySource } from '../api/video'
 import { useVideoStore } from '../stores/video'
 import { useDisplayUser } from '../composables/useDisplayUser'
+import { useRequestLogStore } from '../stores/requestLog'
 
 const videoStore = useVideoStore()
+const requestLogStore = useRequestLogStore()
 const router = useRouter()
 const { displayUser, isAuthenticated, authStore } = useDisplayUser()
 const {
@@ -132,6 +134,7 @@ const {
   loading,
   errorMessage,
 } = storeToRefs(videoStore)
+const { consoleOpen } = storeToRefs(requestLogStore)
 
 const current = ref<VideoItem | null>(null)
 const currentPlaySource = ref('')
@@ -187,8 +190,18 @@ async function loadPage(page: number) {
   const nextPage = Math.max(1, Math.min(page, totalPages.value))
   try {
     await videoStore.loadMyVideos(nextPage, myVideosSize.value)
+    await refreshLogsIfOpen()
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '加载作品失败')
+  }
+}
+
+async function refreshLogsIfOpen() {
+  if (!consoleOpen.value) return
+  try {
+    await requestLogStore.loadLogs()
+  } catch {
+    // 控制台会展示错误态，不打断页面渲染。
   }
 }
 

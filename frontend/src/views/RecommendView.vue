@@ -1,47 +1,57 @@
 <template>
   <div class="recommend">
-    <header class="top-tabs">
-      <span class="t on">推荐</span>
-      <button class="clear-history" type="button" :disabled="clearingHistory" @click="clearHistory">
-        {{ clearingHistory ? '清除中...' : '清除推荐历史' }}
-      </button>
-    </header>
+    <section class="recommend-stage">
+      <header class="top-tabs">
+        <button class="t on" type="button">推荐</button>
+        <button
+          class="t console-toggle"
+          :class="{ on: consoleOpen }"
+          type="button"
+          @click="toggleLogConsole"
+        >
+          日志控制台
+        </button>
+        <button class="clear-history" type="button" :disabled="clearingHistory" @click="clearHistory">
+          {{ clearingHistory ? '清除中...' : '清除推荐历史' }}
+        </button>
+      </header>
 
-    <div v-if="feedLoading" class="state">正在加载推荐...</div>
-    <div v-else-if="feedErrorMessage" class="state action-state">
-      {{ feedErrorMessage }}
-      <button type="button" @click="reload()">重试</button>
-    </div>
-    <div v-else-if="!feed.length" class="state">暂无推荐视频</div>
-
-    <div
-      v-else
-      ref="scroller"
-      class="feed"
-      @wheel="onWheel"
-      @touchstart.passive="onTouchStart"
-      @touchend.passive="onTouchEnd"
-    >
-      <div
-        v-for="(v, i) in feed"
-        :key="v.id"
-        class="slide"
-        :data-index="i"
-      >
-        <VideoCard
-          :video="v"
-          :active="i === activeIndex"
-          @like="onLike(v.id)"
-          @comment="openComments(v.id)"
-        />
+      <div v-if="feedLoading" class="state">正在加载推荐...</div>
+      <div v-else-if="feedErrorMessage" class="state action-state">
+        {{ feedErrorMessage }}
+        <button type="button" @click="reload()">重试</button>
       </div>
-    </div>
+      <div v-else-if="!feed.length" class="state">暂无推荐视频</div>
 
-    <CommentSheet
-      :visible="sheetOpen"
-      :video-id="sheetVideoId"
-      @close="sheetOpen = false"
-    />
+      <div
+        v-else
+        ref="scroller"
+        class="feed"
+        @wheel="onWheel"
+        @touchstart.passive="onTouchStart"
+        @touchend.passive="onTouchEnd"
+      >
+        <div
+          v-for="(v, i) in feed"
+          :key="v.id"
+          class="slide"
+          :data-index="i"
+        >
+          <VideoCard
+            :video="v"
+            :active="i === activeIndex"
+            @like="onLike(v.id)"
+            @comment="openComments(v.id)"
+          />
+        </div>
+      </div>
+
+      <CommentSheet
+        :visible="sheetOpen"
+        :video-id="sheetVideoId"
+        @close="sheetOpen = false"
+      />
+    </section>
   </div>
 </template>
 
@@ -54,15 +64,18 @@ import VideoCard from '../components/VideoCard.vue'
 import CommentSheet from '../components/CommentSheet.vue'
 import { useVideoStore } from '../stores/video'
 import { useAuthStore } from '../stores/auth'
+import { useRequestLogStore } from '../stores/requestLog'
 
 defineOptions({ name: 'RecommendView' })
 
 const videoStore = useVideoStore()
 const authStore = useAuthStore()
+const requestLogStore = useRequestLogStore()
 const route = useRoute()
 const router = useRouter()
 const { feed, feedLoading, feedErrorMessage } = storeToRefs(videoStore)
 const { isAuthenticated } = storeToRefs(authStore)
+const { consoleOpen } = storeToRefs(requestLogStore)
 
 const scroller = ref<HTMLElement | null>(null)
 const activeIndex = ref(0)
@@ -89,6 +102,7 @@ async function onLike(id: number) {
   }
   try {
     await videoStore.toggleLike(id)
+    await refreshLogsIfOpen()
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '点赞失败')
   }
@@ -102,6 +116,7 @@ async function reload(options: { throwOnError?: boolean } = {}) {
     scroller.value?.scrollTo({ top: 0, behavior: 'auto' })
     setupObserver()
     await syncActiveVideo()
+    await refreshLogsIfOpen()
   } catch (error) {
     // 错误文案已经写入 feedErrorMessage。
     if (options.throwOnError) {
@@ -159,8 +174,24 @@ async function syncActiveVideo() {
   }
   try {
     await videoStore.markViewed(video.id)
+    await refreshLogsIfOpen()
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '访问记录上报失败')
+  }
+}
+
+async function toggleLogConsole() {
+  await requestLogStore.toggleConsole()
+  await nextTick()
+  setupObserver()
+}
+
+async function refreshLogsIfOpen() {
+  if (!consoleOpen.value) return
+  try {
+    await requestLogStore.loadLogs()
+  } catch {
+    // 控制台组件会展示错误信息，这里不额外打断推荐页操作。
   }
 }
 
@@ -216,6 +247,21 @@ onBeforeUnmount(() => observer?.disconnect())
   position: absolute;
   inset: 0;
   background: #000;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.recommend-stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  background: #000;
+  transform-origin: top center;
+  transition:
+    flex-basis 0.28s ease,
+    transform 0.28s ease,
+    border-radius 0.28s ease;
 }
 
 .top-tabs {
@@ -239,6 +285,14 @@ onBeforeUnmount(() => observer?.disconnect())
 .top-tabs .t.on {
   color: #fff;
   font-weight: 700;
+}
+
+.top-tabs button.t {
+  padding: 0;
+}
+
+.console-toggle {
+  font-size: 14px;
 }
 
 .clear-history {
