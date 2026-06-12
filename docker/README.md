@@ -78,10 +78,8 @@ PUBLIC_ORIGIN=https://你的域名
 
 ## GitHub Actions CI/CD
 
-仓库提供两个部署入口：
-
-- `docker-compose.prod.yml`：本地或服务器手动构建镜像并启动。
-- `docker-compose.deploy.yml`：CI/CD 使用 GHCR 镜像启动，不在服务器上构建。
+CI/CD 采用服务器本地构建模式：GitHub Actions 打包源码上传到服务器，服务器使用
+`docker-compose.prod.yml` 构建镜像并启动容器。
 
 服务器固定部署目录：
 
@@ -98,14 +96,13 @@ SERVER_PORT=22
 SERVER_SSH_KEY=用于登录服务器的 SSH 私钥
 ```
 
-工作流使用 GitHub Actions 内置的 `GITHUB_TOKEN` 推送镜像，并在部署步骤中临时登录 GHCR 拉取镜像，不需要额外配置 GHCR PAT。
-
 每次 push 到 `main` 后，工作流会：
 
 ```text
-使用 GitHub Actions 缓存构建 frontend dist 和后端 jar
-用 Dockerfile.deploy 打包 frontend/api-backend/auth-backend 运行镜像
-推送到 ghcr.io/kyy008
-同步 docker-compose.deploy.yml、Nginx 配置、MySQL 初始化 SQL 到服务器
-在服务器执行 docker compose pull && docker compose up -d
+打包仓库源码为 release.tgz
+上传到 /home/kyy008/projects/tiktok/releases/<commit>
+软链服务器上的 /home/kyy008/projects/tiktok/.env.prod
+在服务器执行 docker compose --env-file .env.prod -f docker-compose.prod.yml build
+在服务器执行 docker compose --env-file .env.prod -f docker-compose.prod.yml up -d
+保留最近 5 个 release 目录
 ```

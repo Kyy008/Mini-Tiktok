@@ -1,4 +1,5 @@
 node_modules
+dist
 build
 coverage
 .npm
@@ -9,5 +10,3 @@ coverage
 .env.*
 !.env.example
 Dockerfile
-!dist/
-!dist/**
