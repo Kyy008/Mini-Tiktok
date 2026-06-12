@@ -27,6 +27,40 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend assets
+        working-directory: frontend
+        env:
+          VITE_AUTH_BASE_URL: ${{ env.PUBLIC_ORIGIN }}
+          VITE_API_BASE_URL: ${{ env.PUBLIC_ORIGIN }}
+          VITE_CLIENT_ID: tiktok-web
+          VITE_REDIRECT_URI: ${{ env.PUBLIC_ORIGIN }}/oauth/callback
+          VITE_SCOPE: video:read video:write video:like
+        run: |
+          npm ci
+          npm run build
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Build auth backend jar
+        working-directory: auth-backend
+        run: mvn -B -DskipTests package
+
+      - name: Build API backend jar
+        working-directory: api-backend
+        run: mvn -B -DskipTests package
+
       - name: Login to GHCR
         uses: docker/login-action@v3
         with:
@@ -38,16 +72,11 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: ./frontend
+          file: ./frontend/Dockerfile.deploy
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/mini-tiktok-frontend:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/mini-tiktok-frontend:${{ github.sha }}
-          build-args: |
-            VITE_AUTH_BASE_URL=${{ env.PUBLIC_ORIGIN }}
-            VITE_API_BASE_URL=${{ env.PUBLIC_ORIGIN }}
-            VITE_CLIENT_ID=tiktok-web
-            VITE_REDIRECT_URI=${{ env.PUBLIC_ORIGIN }}/oauth/callback
-            VITE_SCOPE=video:read video:write video:like
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend
 
@@ -55,6 +84,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: ./auth-backend
+          file: ./auth-backend/Dockerfile.deploy
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/mini-tiktok-auth-backend:latest
@@ -66,6 +96,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: ./api-backend
+          file: ./api-backend/Dockerfile.deploy
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/mini-tiktok-api-backend:latest

@@ -103,7 +103,8 @@ SERVER_SSH_KEY=用于登录服务器的 SSH 私钥
 每次 push 到 `main` 后，工作流会：
 
 ```text
-构建 frontend/api-backend/auth-backend 镜像
+使用 GitHub Actions 缓存构建 frontend dist 和后端 jar
+用 Dockerfile.deploy 打包 frontend/api-backend/auth-backend 运行镜像
 推送到 ghcr.io/kyy008
 同步 docker-compose.deploy.yml、Nginx 配置、MySQL 初始化 SQL 到服务器
 在服务器执行 docker compose pull && docker compose up -d
