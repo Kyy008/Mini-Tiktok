@@ -60,6 +60,7 @@ const emit = defineEmits<{ like: []; comment: [] }>()
 
 const videoEl = ref<HTMLVideoElement | null>(null)
 const playing = ref(false)
+const soundEnabled = ref(false)
 const showHeart = ref(false)
 const heartStyle = ref<Record<string, string>>({})
 const playSource = ref(props.video.playUrl)
@@ -82,7 +83,14 @@ watch(
 function togglePlay() {
   const el = videoEl.value
   if (!el) return
+  if (!el.paused && el.muted) {
+    soundEnabled.value = true
+    el.muted = false
+    playing.value = true
+    return
+  }
   if (el.paused) {
+    soundEnabled.value = true
     el.muted = false
     void el.play()
       .then(() => {
@@ -122,11 +130,21 @@ async function syncPlayback(active: boolean) {
   }
 
   el.currentTime = 0
-  el.muted = true
+  el.muted = !soundEnabled.value
   try {
     await el.play()
     playing.value = true
   } catch {
+    if (!el.muted) {
+      el.muted = true
+      try {
+        await el.play()
+        playing.value = true
+        return
+      } catch {
+        // 保持下方统一失败状态。
+      }
+    }
     playing.value = false
   }
 }
