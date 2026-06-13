@@ -24,7 +24,7 @@ export const useVideoStore = defineStore('video', () => {
   const feed = ref<VideoItem[]>([])
   const myVideos = ref<VideoItem[]>([])
   const myVideosPage = ref(1)
-  const myVideosSize = ref(5)
+  const myVideosSize = ref(3)
   const myVideosTotal = ref(0)
   const myVideosHasMore = ref(false)
   const loading = ref(false)
