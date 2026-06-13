@@ -55,12 +55,11 @@ import type { VideoItem } from '../api/types'
 import { resolveVideoPlaySource } from '../api/video'
 import ActionRail from './ActionRail.vue'
 
-const props = defineProps<{ video: VideoItem; active: boolean }>()
-const emit = defineEmits<{ like: []; comment: [] }>()
+const props = defineProps<{ video: VideoItem; active: boolean; soundEnabled: boolean }>()
+const emit = defineEmits<{ like: []; comment: []; 'enable-sound': [] }>()
 
 const videoEl = ref<HTMLVideoElement | null>(null)
 const playing = ref(false)
-const soundEnabled = ref(false)
 const showHeart = ref(false)
 const heartStyle = ref<Record<string, string>>({})
 const playSource = ref(props.video.playUrl)
@@ -80,17 +79,27 @@ watch(
   { immediate: true },
 )
 
+watch(
+  () => props.soundEnabled,
+  (enabled) => {
+    const el = videoEl.value
+    if (enabled && props.active && el && !el.paused) {
+      el.muted = false
+    }
+  },
+)
+
 function togglePlay() {
   const el = videoEl.value
   if (!el) return
   if (!el.paused && el.muted) {
-    soundEnabled.value = true
+    emit('enable-sound')
     el.muted = false
     playing.value = true
     return
   }
   if (el.paused) {
-    soundEnabled.value = true
+    emit('enable-sound')
     el.muted = false
     void el.play()
       .then(() => {
@@ -130,7 +139,7 @@ async function syncPlayback(active: boolean) {
   }
 
   el.currentTime = 0
-  el.muted = !soundEnabled.value
+  el.muted = !props.soundEnabled
   try {
     await el.play()
     playing.value = true

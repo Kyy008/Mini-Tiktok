@@ -29,6 +29,7 @@
         class="feed"
         @wheel="onWheel"
         @touchstart.passive="onTouchStart"
+        @touchmove.prevent="onTouchMove"
         @touchend.passive="onTouchEnd"
       >
         <div
@@ -40,8 +41,10 @@
           <VideoCard
             :video="v"
             :active="i === activeIndex"
+            :sound-enabled="soundEnabled"
             @like="onLike(v.id)"
             @comment="openComments(v.id)"
+            @enable-sound="soundEnabled = true"
           />
         </div>
       </div>
@@ -79,13 +82,16 @@ const { consoleOpen } = storeToRefs(requestLogStore)
 
 const scroller = ref<HTMLElement | null>(null)
 const activeIndex = ref(0)
+const soundEnabled = ref(false)
 const sheetOpen = ref(false)
 const sheetVideoId = ref<number | null>(null)
 const clearingHistory = ref(false)
 
 let observer: IntersectionObserver | null = null
 let touchStartY = 0
+let touchStartIndex = 0
 let wheelLock = false
+let touchLock = false
 
 function openComments(id: number) {
   sheetVideoId.value = id
@@ -216,13 +222,23 @@ function onWheel(event: WheelEvent) {
 
 function onTouchStart(event: TouchEvent) {
   touchStartY = event.changedTouches[0]?.clientY ?? 0
+  touchStartIndex = activeIndex.value
+}
+
+function onTouchMove() {
+  // 阻止原生惯性滚动，确保一次触摸手势只由 onTouchEnd 翻一个视频。
 }
 
 function onTouchEnd(event: TouchEvent) {
+  if (touchLock) return
   const endY = event.changedTouches[0]?.clientY ?? touchStartY
   const delta = touchStartY - endY
   if (Math.abs(delta) < 40) return
-  goToIndex(activeIndex.value + (delta > 0 ? 1 : -1))
+  touchLock = true
+  goToIndex(touchStartIndex + (delta > 0 ? 1 : -1))
+  window.setTimeout(() => {
+    touchLock = false
+  }, 420)
 }
 
 onMounted(reload)
@@ -323,6 +339,7 @@ onBeforeUnmount(() => observer?.disconnect())
   scroll-snap-type: y mandatory;
   scrollbar-width: none;
   overscroll-behavior-y: contain;
+  touch-action: none;
 }
 
 .feed::-webkit-scrollbar {
