@@ -27,7 +27,7 @@
           v-model="title"
           maxlength="55"
           rows="3"
-          placeholder="添加作品描述..."
+          placeholder="添加标题"
         />
         <span class="count">{{ title.length }}/55</span>
       </div>
@@ -113,6 +113,7 @@ function resetForm() {
   revokePreviewUrl()
   file.value = null
   title.value = ''
+  videoStore.clearUploadProgress()
   resetFileInput()
 }
 
@@ -129,7 +130,10 @@ function revokePreviewUrl() {
   }
 }
 
-onBeforeUnmount(revokePreviewUrl)
+onBeforeUnmount(() => {
+  revokePreviewUrl()
+  videoStore.clearUploadProgress()
+})
 </script>
 
 <style scoped>

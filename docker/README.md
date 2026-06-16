@@ -1,0 +1,109 @@
+# Mini-Tiktok Docker 部署说明
+
+## 本地生产栈验证
+
+在项目根目录执行：
+
+```bash
+cp .env.prod.example .env.prod
+docker compose --env-file .env.prod -f docker-compose.prod.yml config
+docker compose --env-file .env.prod -f docker-compose.prod.yml build --progress=plain
+docker compose --env-file .env.prod -f docker-compose.prod.yml up -d
+```
+
+默认访问地址：
+
+```text
+http://localhost:8088
+```
+
+查看容器状态：
+
+```bash
+docker compose --env-file .env.prod -f docker-compose.prod.yml ps
+```
+
+查看日志：
+
+```bash
+docker compose --env-file .env.prod -f docker-compose.prod.yml logs -f auth-backend api-backend nginx
+```
+
+停止服务：
+
+```bash
+docker compose --env-file .env.prod -f docker-compose.prod.yml down
+```
+
+## 关键验证命令
+
+```bash
+curl -i http://localhost:8088/
+curl -i http://localhost:8088/api/videos/recommendations
+curl -i http://localhost:8088/oauth2/jwks
+curl -i http://localhost:8088/.well-known/oauth-authorization-server
+curl -i "http://localhost:8088/api/request-logs?limit=5"
+```
+
+OAuth 未登录跳转验证：
+
+```bash
+curl -i "http://localhost:8088/oauth2/authorize?response_type=code&client_id=tiktok-web&redirect_uri=http%3A%2F%2Flocalhost%3A8088%2Foauth%2Fcallback&scope=video%3Aread%20video%3Awrite%20video%3Alike&state=dev&code_challenge=abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGH&code_challenge_method=S256"
+```
+
+正常情况下响应头里的 `Location` 应该是：
+
+```text
+http://localhost:8088/login
+```
+
+## 上服务器前需要修改
+
+复制 `.env.prod.example` 为服务器上的 `.env.prod`，至少修改：
+
+```env
+PUBLIC_ORIGIN=http://你的域名
+HTTP_PORT=80
+MYSQL_ROOT_PASSWORD=强密码
+MYSQL_PASSWORD=强密码
+```
+
+如果后续配置 HTTPS，将 `PUBLIC_ORIGIN` 改成：
+
+```env
+PUBLIC_ORIGIN=https://你的域名
+```
+
+生产环境 MySQL 默认不暴露到公网，只供容器内部访问。视频文件和上传临时文件分别通过 Docker volume 持久化保存。
+
+## GitHub Actions CI/CD
+
+CI/CD 采用混合部署模式：GitHub Actions 先构建前端 `dist` 和后端 `jar`，再把源码与构建产物上传到服务器，服务器使用
+`docker-compose.release.yml` 打包轻量运行镜像并启动容器。
+
+服务器固定部署目录：
+
+```text
+/home/kyy008/projects/tiktok
+```
+
+GitHub Actions 需要配置以下 Repository Secrets：
+
+```text
+SERVER_HOST=39.102.59.66
+SERVER_USER=kyy008
+SERVER_PORT=22
+SERVER_SSH_KEY=用于登录服务器的 SSH 私钥
+```
+
+每次 push 到 `main` 后，工作流会：
+
+```text
+在 GitHub Actions 构建 frontend dist、api-backend jar、auth-backend jar
+打包源码与构建产物为 release.tgz
+上传到 /home/kyy008/projects/tiktok/releases/<commit>
+软链服务器上的 /home/kyy008/projects/tiktok/.env.prod
+在服务器执行 docker compose --env-file .env.prod -f docker-compose.release.yml build
+在服务器执行 docker compose --env-file .env.prod -f docker-compose.release.yml up -d
+保留最近 5 个 release 目录
+```

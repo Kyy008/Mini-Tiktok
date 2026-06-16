@@ -54,7 +54,7 @@ async function submit() {
 
 function goRegister() {
   router.push({
-    path: '/register',
+    path: '/auth/register',
     query: redirectPath.value ? { redirect: redirectPath.value } : undefined,
   })
 }

@@ -55,8 +55,8 @@ import type { VideoItem } from '../api/types'
 import { resolveVideoPlaySource } from '../api/video'
 import ActionRail from './ActionRail.vue'
 
-const props = defineProps<{ video: VideoItem; active: boolean }>()
-const emit = defineEmits<{ like: []; comment: [] }>()
+const props = defineProps<{ video: VideoItem; active: boolean; soundEnabled: boolean }>()
+const emit = defineEmits<{ like: []; comment: []; 'enable-sound': [] }>()
 
 const videoEl = ref<HTMLVideoElement | null>(null)
 const playing = ref(false)
@@ -79,10 +79,27 @@ watch(
   { immediate: true },
 )
 
+watch(
+  () => props.soundEnabled,
+  (enabled) => {
+    const el = videoEl.value
+    if (enabled && props.active && el && !el.paused) {
+      el.muted = false
+    }
+  },
+)
+
 function togglePlay() {
   const el = videoEl.value
   if (!el) return
+  if (!el.paused && el.muted) {
+    emit('enable-sound')
+    el.muted = false
+    playing.value = true
+    return
+  }
   if (el.paused) {
+    emit('enable-sound')
     el.muted = false
     void el.play()
       .then(() => {
@@ -122,11 +139,21 @@ async function syncPlayback(active: boolean) {
   }
 
   el.currentTime = 0
-  el.muted = true
+  el.muted = !props.soundEnabled
   try {
     await el.play()
     playing.value = true
   } catch {
+    if (!el.muted) {
+      el.muted = true
+      try {
+        await el.play()
+        playing.value = true
+        return
+      } catch {
+        // 保持下方统一失败状态。
+      }
+    }
     playing.value = false
   }
 }

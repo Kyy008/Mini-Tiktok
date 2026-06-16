@@ -32,6 +32,7 @@ class InteractionRecommendationIntegrationTest {
     @BeforeEach
     void cleanDatabase() {
         jdbcTemplate.update("delete from request_log");
+        jdbcTemplate.update("delete from video_comment");
         jdbcTemplate.update("delete from video_view");
         jdbcTemplate.update("delete from video_like");
         jdbcTemplate.update("delete from video_upload_session");

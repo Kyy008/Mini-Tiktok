@@ -183,7 +183,13 @@ function sanitizeRedirectPath(path?: string): string | undefined {
   if (!path || !path.startsWith('/') || path.startsWith('//')) {
     return undefined
   }
-  if (path.startsWith('/login') || path.startsWith('/register') || path.startsWith('/oauth/callback')) {
+  if (
+    path.startsWith('/login') ||
+    path.startsWith('/register') ||
+    path.startsWith('/auth/login') ||
+    path.startsWith('/auth/register') ||
+    path.startsWith('/oauth/callback')
+  ) {
     return undefined
   }
   return path

@@ -3,6 +3,10 @@ import { ref } from 'vue'
 
 import type { CommentItem, PageResult, UploadProgress, VideoItem } from '../api/types'
 import {
+  createVideoComment as createVideoCommentApi,
+  getVideoComments as fetchVideoComments,
+} from '../api/comment'
+import {
   clearVideoViewHistory as clearVideoViewHistoryApi,
   deleteVideo as deleteVideoApi,
   getRecommendations as fetchRecommendations,
@@ -20,7 +24,7 @@ export const useVideoStore = defineStore('video', () => {
   const feed = ref<VideoItem[]>([])
   const myVideos = ref<VideoItem[]>([])
   const myVideosPage = ref(1)
-  const myVideosSize = ref(5)
+  const myVideosSize = ref(3)
   const myVideosTotal = ref(0)
   const myVideosHasMore = ref(false)
   const loading = ref(false)
@@ -29,6 +33,7 @@ export const useVideoStore = defineStore('video', () => {
   const feedErrorMessage = ref('')
   const uploadProgress = ref<UploadProgress | null>(null)
   const viewedVideoIds = ref<Set<number>>(new Set())
+  const recommendationsStale = ref(false)
 
   interface LoadMyVideosOptions {
     preserveOnError?: boolean
@@ -43,12 +48,18 @@ export const useVideoStore = defineStore('video', () => {
     replaceInList(myVideos, video)
   }
 
+  function setCommentCount(id: number, count: number): void {
+    setCommentCountInList(feed, id, count)
+    setCommentCountInList(myVideos, id, count)
+  }
+
   async function loadRecommendations(size = 10): Promise<VideoItem[]> {
     feedLoading.value = true
     feedErrorMessage.value = ''
     try {
       const videos = await fetchRecommendations(size)
       feed.value = videos
+      recommendationsStale.value = false
       return videos
     } catch (error) {
       feed.value = []
@@ -115,8 +126,15 @@ export const useVideoStore = defineStore('video', () => {
     viewedVideoIds.value.clear()
   }
 
-  function loadComments(_id: number): CommentItem[] {
-    return []
+  async function loadComments(id: number): Promise<CommentItem[]> {
+    const comments = await fetchVideoComments(id)
+    setCommentCount(id, comments.length)
+    return comments
+  }
+
+  async function createComment(id: number, content: string): Promise<CommentItem[]> {
+    await createVideoCommentApi(id, content)
+    return loadComments(id)
   }
 
   async function loadMyVideos(
@@ -157,6 +175,7 @@ export const useVideoStore = defineStore('video', () => {
       const item = await uploadVideoApi(file, title, (progress) => {
         uploadProgress.value = progress
       })
+      invalidateRecommendations()
       myVideos.value.unshift(item)
       myVideosTotal.value += 1
       return item
@@ -168,6 +187,10 @@ export const useVideoStore = defineStore('video', () => {
     }
   }
 
+  function clearUploadProgress(): void {
+    uploadProgress.value = null
+  }
+
   async function deleteVideo(id: number): Promise<void> {
     loading.value = true
     errorMessage.value = ''
@@ -175,6 +198,7 @@ export const useVideoStore = defineStore('video', () => {
       await deleteVideoApi(id)
       myVideos.value = myVideos.value.filter((v) => v.id !== id)
       feed.value = feed.value.filter((v) => v.id !== id)
+      invalidateRecommendations()
       myVideosTotal.value = Math.max(0, myVideosTotal.value - 1)
     } catch (error) {
       errorMessage.value = getErrorMessage(error)
@@ -182,6 +206,10 @@ export const useVideoStore = defineStore('video', () => {
     } finally {
       loading.value = false
     }
+  }
+
+  function invalidateRecommendations(): void {
+    recommendationsStale.value = true
   }
 
   return {
@@ -196,10 +224,14 @@ export const useVideoStore = defineStore('video', () => {
     errorMessage,
     feedErrorMessage,
     uploadProgress,
+    recommendationsStale,
+    clearUploadProgress,
+    invalidateRecommendations,
     toggleLike,
     markViewed,
     clearViewHistory,
     loadComments,
+    createComment,
     loadRecommendations,
     loadVideoDetail,
     refreshLikeStatus,
@@ -213,6 +245,14 @@ function replaceInList(list: { value: VideoItem[] }, video: VideoItem): void {
   const index = list.value.findIndex((item) => item.id === video.id)
   if (index !== -1) {
     list.value[index] = video
+  }
+}
+
+function setCommentCountInList(list: { value: VideoItem[] }, id: number, count: number): void {
+  for (const video of list.value) {
+    if (video.id === id) {
+      video.commentCount = count
+    }
   }
 }
 

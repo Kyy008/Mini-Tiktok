@@ -48,7 +48,7 @@
       <template v-else>
         <div v-if="myVideos.length" class="grid">
           <div v-for="v in myVideos" :key="v.id" class="cell" @click="play(v)">
-            <img :src="v.coverUrl" alt="" />
+            <img :src="coverFor(v)" alt="" />
             <span class="like-tag">♥ {{ v.likeCount }}</span>
           </div>
         </div>
@@ -96,7 +96,7 @@
         <video
           class="full"
           :src="currentPlaySource"
-          :poster="current.coverUrl"
+          :poster="currentPosterUrl"
           autoplay
           loop
           playsinline
@@ -112,7 +112,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -120,8 +120,11 @@ import type { VideoItem } from '../api/types'
 import { resolveVideoPlaySource } from '../api/video'
 import { useVideoStore } from '../stores/video'
 import { useDisplayUser } from '../composables/useDisplayUser'
+import { useRequestLogStore } from '../stores/requestLog'
+import { captureVideoFirstFrameDataUrl } from '../utils/videoThumbnail'
 
 const videoStore = useVideoStore()
+const requestLogStore = useRequestLogStore()
 const router = useRouter()
 const { displayUser, isAuthenticated, authStore } = useDisplayUser()
 const {
@@ -132,10 +135,14 @@ const {
   loading,
   errorMessage,
 } = storeToRefs(videoStore)
+const { consoleOpen } = storeToRefs(requestLogStore)
 
 const current = ref<VideoItem | null>(null)
 const currentPlaySource = ref('')
 const deleting = ref(false)
+const thumbnailByVideoId = reactive(new Map<number, string>())
+const generatingVideoIds = new Set<number>()
+let disposed = false
 
 const totalPages = computed(() => Math.max(1, Math.ceil(myVideosTotal.value / myVideosSize.value)))
 const visiblePages = computed(() => {
@@ -162,6 +169,45 @@ const profileStats = computed(() => ({
     ? myVideos.value.reduce((total, item) => total + item.likeCount, 0).toString()
     : '0',
 }))
+const currentPosterUrl = computed(() => {
+  if (!current.value) {
+    return ''
+  }
+  return coverFor(current.value)
+})
+
+function coverFor(video: Pick<VideoItem, 'id' | 'coverUrl'>): string {
+  return thumbnailByVideoId.get(video.id) || video.coverUrl
+}
+
+async function refreshThumbnails(videos: VideoItem[]) {
+  await Promise.all(
+    videos.map(async (video) => {
+      if (thumbnailByVideoId.has(video.id) || generatingVideoIds.has(video.id)) {
+        return
+      }
+
+      generatingVideoIds.add(video.id)
+      try {
+        const thumbnail = await captureVideoFirstFrameDataUrl(video.playUrl)
+        if (disposed) {
+          return
+        }
+
+        const currentVideo = myVideos.value.find((item) => item.id === video.id)
+        if (!currentVideo || currentVideo.playUrl !== video.playUrl) {
+          return
+        }
+
+        thumbnailByVideoId.set(video.id, thumbnail)
+      } catch {
+        // 首帧生成失败时保留原有封面兜底。
+      } finally {
+        generatingVideoIds.delete(video.id)
+      }
+    }),
+  )
+}
 
 async function play(v: VideoItem) {
   current.value = v
@@ -187,8 +233,18 @@ async function loadPage(page: number) {
   const nextPage = Math.max(1, Math.min(page, totalPages.value))
   try {
     await videoStore.loadMyVideos(nextPage, myVideosSize.value)
+    await refreshLogsIfOpen()
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '加载作品失败')
+  }
+}
+
+async function refreshLogsIfOpen() {
+  if (!consoleOpen.value) return
+  try {
+    await requestLogStore.loadLogs()
+  } catch {
+    // 控制台会展示错误态，不打断页面渲染。
   }
 }
 
@@ -228,21 +284,36 @@ function onLogout() {
 }
 
 function onLogin() {
-  router.push('/login')
+  router.push('/auth/login')
 }
 
 function onRegister() {
-  router.push('/register')
+  router.push('/auth/register')
 }
 
-onMounted(() => {
-  void loadPage(1)
-})
+watch(
+  myVideos,
+  (videos) => {
+    void refreshThumbnails(videos)
+  },
+  { immediate: true },
+)
 
 watch(isAuthenticated, (value) => {
   if (value) {
     void loadPage(1)
   }
+})
+
+onMounted(() => {
+  disposed = false
+  void loadPage(1)
+})
+
+onBeforeUnmount(() => {
+  disposed = true
+  thumbnailByVideoId.clear()
+  generatingVideoIds.clear()
 })
 </script>
 

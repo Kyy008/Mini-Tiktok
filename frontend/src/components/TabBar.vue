@@ -29,7 +29,7 @@ interface Tab {
 const tabs: Tab[] = [
   { key: 'home', label: '首页', to: '/' },
   { key: 'plus', label: '' },
-  { key: 'me', label: '我', to: '/my/videos' },
+  { key: 'me', label: '我的', to: '/my/videos' },
 ]
 
 const route = useRoute()

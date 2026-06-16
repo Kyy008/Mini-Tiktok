@@ -40,9 +40,9 @@ export interface VideoItem {
 
 export interface CommentItem {
   id: number
+  videoId: number
   user: UserInfo
   content: string
-  likeCount: number
   createdAt: string
 }
 
@@ -62,4 +62,17 @@ export interface UploadProgress {
   totalChunks: number
   percent: number
   status: string
+}
+
+export interface RequestLogItem {
+  id: number
+  userId: string | null
+  method: string
+  path: string
+  requestBody: string | null
+  responseBody: string | null
+  statusCode: number
+  durationMs: number
+  ip: string | null
+  createdAt: string
 }

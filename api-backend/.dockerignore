@@ -1,0 +1,12 @@
+target/*
+!target/*.jar
+build
+out
+.gradle
+logs
+*.log
+.env
+.env.*
+storage/videos/*
+storage/uploads/*
+Dockerfile

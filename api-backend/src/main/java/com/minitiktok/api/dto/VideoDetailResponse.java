@@ -9,5 +9,6 @@ public record VideoDetailResponse(
         LocalDateTime createdAt,
         String uploaderId,
         Long likeCount,
+        Long commentCount,
         Boolean liked) {
 }

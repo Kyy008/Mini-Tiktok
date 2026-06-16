@@ -47,6 +47,7 @@ class InteractionControllerTest {
                         1L,
                         "Recommended Video",
                         3L,
+                        2L,
                         true,
                         "/api/videos/1/play",
                         LocalDateTime.of(2026, 6, 3, 12, 0))));
@@ -58,6 +59,7 @@ class InteractionControllerTest {
                 .andExpect(jsonPath("$.data[0].id").value(1))
                 .andExpect(jsonPath("$.data[0].title").value("Recommended Video"))
                 .andExpect(jsonPath("$.data[0].likeCount").value(3))
+                .andExpect(jsonPath("$.data[0].commentCount").value(2))
                 .andExpect(jsonPath("$.data[0].liked").value(true))
                 .andExpect(jsonPath("$.data[0].playUrl").value("/api/videos/1/play"))
                 .andExpect(jsonPath("$.data[0].createdAt").value("2026-06-03T12:00:00"));
@@ -70,6 +72,7 @@ class InteractionControllerTest {
                         2L,
                         "Guest Video",
                         5L,
+                        0L,
                         false,
                         "/api/videos/2/play",
                         LocalDateTime.of(2026, 6, 3, 13, 0))));

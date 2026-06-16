@@ -8,25 +8,29 @@
         </div>
 
         <ul class="list">
+          <li v-if="loading" class="state">评论加载中...</li>
+          <li v-else-if="errorMessage" class="state error">{{ errorMessage }}</li>
+          <li v-else-if="comments.length === 0" class="state">还没有评论，来发第一条吧</li>
           <li v-for="c in comments" :key="c.id" class="comment">
-            <img class="avatar" :src="c.user.avatar" alt="" />
+            <div class="avatar">{{ getAvatarText(c.user.username) }}</div>
             <div class="body">
               <div class="name">{{ c.user.username }}</div>
               <div class="text">{{ c.content }}</div>
-              <div class="meta">{{ c.createdAt }}</div>
-            </div>
-            <div class="like">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="rgba(255,255,255,0.5)">
-                <path d="M12 21s-7.5-4.6-10-9.2C.6 9 1.7 5.6 5 4.7 7.2 4.1 9.4 5 12 7.6 14.6 5 16.8 4.1 19 4.7c3.3.9 4.4 4.3 3 7.1C19.5 16.4 12 21 12 21z" />
-              </svg>
-              <span>{{ c.likeCount }}</span>
+              <div class="meta">{{ formatTime(c.createdAt) }}</div>
             </div>
           </li>
         </ul>
 
         <div class="input-bar">
-          <input v-model="draft" placeholder="善语结善缘，恶言伤人心" @keyup.enter="send" />
-          <button :disabled="!draft.trim()" @click="send">发送</button>
+          <input
+            v-model="draft"
+            :disabled="sending"
+            placeholder="善语结善缘，恶言伤人心"
+            @keyup.enter="send"
+          />
+          <button :disabled="sending || !draft.trim()" @click="send">
+            {{ sending ? '发送中' : '发送' }}
+          </button>
         </div>
       </div>
     </div>
@@ -36,37 +40,86 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import type { CommentItem } from '../api/types'
+import { useAuthStore } from '../stores/auth'
 import { useVideoStore } from '../stores/video'
-import { useDisplayUser } from '../composables/useDisplayUser'
 
 const props = defineProps<{ visible: boolean; videoId: number | null }>()
 defineEmits<{ close: [] }>()
 
+const authStore = useAuthStore()
 const videoStore = useVideoStore()
-const { displayUser } = useDisplayUser()
 const comments = ref<CommentItem[]>([])
 const draft = ref('')
+const loading = ref(false)
+const sending = ref(false)
+const errorMessage = ref('')
 
 watch(
   () => [props.visible, props.videoId],
-  () => {
+  async () => {
     if (props.visible && props.videoId != null) {
-      comments.value = videoStore.loadComments(props.videoId)
+      await refreshComments()
     }
   },
+  { immediate: true },
 )
 
-function send() {
+async function refreshComments() {
+  if (props.videoId == null) return
+  loading.value = true
+  errorMessage.value = ''
+  try {
+    comments.value = await videoStore.loadComments(props.videoId)
+  } catch (error) {
+    comments.value = []
+    errorMessage.value = getErrorMessage(error)
+  } finally {
+    loading.value = false
+  }
+}
+
+async function send() {
   const text = draft.value.trim()
-  if (!text) return
-  comments.value.unshift({
-    id: Date.now(),
-    user: displayUser.value,
-    content: text,
-    likeCount: 0,
-    createdAt: '刚刚',
+  if (!text || props.videoId == null || sending.value) return
+  if (!authStore.isAuthenticated) {
+    errorMessage.value = '请先登录后再发表评论'
+    await authStore.login({ redirectPath: window.location.pathname })
+    return
+  }
+
+  sending.value = true
+  errorMessage.value = ''
+  try {
+    comments.value = await videoStore.createComment(props.videoId, text)
+    draft.value = ''
+  } catch (error) {
+    errorMessage.value = getErrorMessage(error)
+  } finally {
+    sending.value = false
+  }
+}
+
+function getAvatarText(username: string): string {
+  const normalized = username.trim()
+  if (!normalized) return '匿'
+  return normalized.slice(0, 1).toUpperCase()
+}
+
+function formatTime(value: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
+  return date.toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
   })
-  draft.value = ''
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : '操作失败'
 }
 </script>
 
@@ -122,7 +175,12 @@ function send() {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  object-fit: cover;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #2f80ed, #27ae60);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
   flex-shrink: 0;
 }
 
@@ -148,13 +206,15 @@ function send() {
   margin-top: 4px;
 }
 
-.like {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.5);
+.state {
+  padding: 28px 0;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 13px;
+}
+
+.state.error {
+  color: #ff7b9a;
 }
 
 .input-bar {

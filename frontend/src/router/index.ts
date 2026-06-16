@@ -22,13 +22,13 @@ const router = createRouter({
       meta: { hideTab: true },
     },
     {
-      path: '/login',
+      path: '/auth/login',
       name: 'login',
       component: AuthLoginView,
       meta: { hideTab: true },
     },
     {
-      path: '/register',
+      path: '/auth/register',
       name: 'register',
       component: AuthRegisterView,
       meta: { hideTab: true },
@@ -50,7 +50,7 @@ const router = createRouter({
 router.beforeEach((to) => {
   if (to.meta.requiresAuth && !getAccessToken()) {
     return {
-      path: '/login',
+      path: '/auth/login',
       query: { redirect: to.fullPath },
     }
   }

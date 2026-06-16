@@ -52,6 +52,10 @@ public class RequestLogAspect {
         String path = request.getRequestURI();
         String ip = request.getRemoteAddr();
 
+        if ("DELETE".equals(method) && "/api/request-logs".equals(path)) {
+            return joinPoint.proceed();
+        }
+
         // 健壮性处理：防止匿名访问（未登录）时 SecurityContextHolder 报空指针
         String userId = "ANONYMOUS";
         if (SecurityContextHolder.getContext().getAuthentication() != null) {
