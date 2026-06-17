@@ -13,4 +13,5 @@ auth-backend/src/test/resources/mockito-extensions/
 !.env.example
 !.env.prod.example
 .trae/
-/.idea
+.claude/
+.idea/
