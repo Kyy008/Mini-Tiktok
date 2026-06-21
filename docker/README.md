@@ -76,6 +76,9 @@ PUBLIC_ORIGIN=https://你的域名
 
 生产环境 MySQL 默认不暴露到公网，只供容器内部访问。视频文件和上传临时文件分别通过 Docker volume 持久化保存。
 
+线上发布配置将 MySQL 映射到服务器回环地址 `127.0.0.1:3307`，用于通过 SSH
+隧道从 Navicat 等数据库客户端访问。该端口不会直接监听公网网卡。
+
 ## GitHub Actions CI/CD
 
 CI/CD 采用混合部署模式：GitHub Actions 先构建前端 `dist` 和后端 `jar`，再把源码与构建产物上传到服务器，服务器使用
