@@ -15,6 +15,9 @@ import com.minitiktok.api.service.VideoCommentService;
 import com.minitiktok.api.service.VideoService;
 import com.minitiktok.api.storage.StoredVideoFile;
 import com.minitiktok.api.storage.VideoStorageService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -39,6 +42,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequiredArgsConstructor
+@Tag(name = "视频", description = "视频详情、播放、上传和作品管理")
 public class VideoController {
     private static final int MAX_TITLE_LENGTH = 128;
     private static final long LEGACY_MULTIPART_UPLOAD_MAX_BYTES = 10L * 1024 * 1024;
@@ -49,6 +53,7 @@ public class VideoController {
     private final InteractionService interactionService;
     private final VideoCommentService videoCommentService;
 
+    @Operation(summary = "获取视频详情")
     @GetMapping("/api/videos/{id}")
     public Result<VideoDetailResponse> getVideoDetail(@PathVariable("id") Long id) {
         Video video = videoService.findActiveById(id)
@@ -62,6 +67,7 @@ public class VideoController {
         return Result.success(toVideoDetailResponse(video, likeCount, commentCount, liked));
     }
 
+    @Operation(summary = "播放视频", description = "支持 HTTP Range 分段请求")
     @GetMapping("/api/videos/{id}/play")
     public ResponseEntity<?> playVideo(
             @PathVariable("id") Long id,
@@ -72,6 +78,8 @@ public class VideoController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
+    @Operation(summary = "上传小视频", description = "multipart 上传，文件最大 10 MB")
+    @SecurityRequirement(name = "BearerAuth")
     @PostMapping("/api/videos")
     public Result<UploadVideoResponse> uploadVideo(
             @RequestParam("file") MultipartFile file,
@@ -96,6 +104,8 @@ public class VideoController {
         return Result.success(response);
     }
 
+    @Operation(summary = "分页获取我的视频")
+    @SecurityRequirement(name = "BearerAuth")
     @GetMapping("/api/my/videos")
     public Result<MyVideosPageResponse> getMyVideos(
             @RequestParam(name = "page", defaultValue = "1") long page,
@@ -115,6 +125,8 @@ public class VideoController {
                 videoPage.getTotal()));
     }
 
+    @Operation(summary = "删除我的视频")
+    @SecurityRequirement(name = "BearerAuth")
     @DeleteMapping("/api/videos/{id}")
     public Result<Void> deleteVideo(@PathVariable("id") Long id) {
         Video video = videoService.findActiveById(id)

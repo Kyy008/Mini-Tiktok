@@ -11,9 +11,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import com.minitiktok.api.security.CurrentUser;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 @RestController
 @RequiredArgsConstructor
+@Tag(name = "视频互动", description = "推荐、点赞和浏览历史")
 public class InteractionController {
 
     private final CurrentUserService currentUserService;
@@ -21,6 +25,7 @@ public class InteractionController {
     private final InteractionService interactionService;
 
     // 1. 推荐接口：GET /api/videos/recommendations?size=10
+    @Operation(summary = "获取推荐视频")
     @GetMapping("/api/videos/recommendations")
     public Result<List<VideoRecommendationVO>> getRecommendations(
             @RequestParam(name = "size", defaultValue = "10") int size) {
@@ -36,6 +41,8 @@ public class InteractionController {
     }
 
     // 2. 点赞视频：POST /api/videos/{id}/likes
+    @Operation(summary = "点赞视频")
+    @SecurityRequirement(name = "BearerAuth")
     @PostMapping("/api/videos/{id}/likes")
     public Result<VideoLikeStatusResponse> likeVideo(@PathVariable("id") Long id) {
         // 核心要求：删除或不存在的视频返回 404
@@ -47,6 +54,8 @@ public class InteractionController {
     }
 
     // 3. 取消点赞：DELETE /api/videos/{id}/likes
+    @Operation(summary = "取消点赞")
+    @SecurityRequirement(name = "BearerAuth")
     @DeleteMapping("/api/videos/{id}/likes")
     public Result<VideoLikeStatusResponse> unlikeVideo(@PathVariable("id") Long id) {
         // 未点赞或不存在的保持稳定返回成功，但仍需验证视频活跃性
@@ -58,6 +67,7 @@ public class InteractionController {
     }
 
     // 4. 查询点赞状态与数量：GET /api/videos/{id}/likes
+    @Operation(summary = "查询点赞状态与数量")
     @GetMapping("/api/videos/{id}/likes")
     public Result<VideoLikeStatusResponse> getLikeStatus(@PathVariable("id") Long id) {
         videoService.findActiveById(id).orElseThrow(VideoNotFoundException::new);
@@ -71,6 +81,8 @@ public class InteractionController {
     }
 
     // 5. 记录访问记录接口：POST /api/videos/{id}/views
+    @Operation(summary = "记录视频浏览")
+    @SecurityRequirement(name = "BearerAuth")
     @PostMapping("/api/videos/{id}/views")
     public Result<Void> recordVideoView(@PathVariable("id") Long id) {
         videoService.findActiveById(id).orElseThrow(VideoNotFoundException::new);
@@ -81,6 +93,8 @@ public class InteractionController {
     }
 
     // 6. 清除当前用户的推荐历史：DELETE /api/videos/views
+    @Operation(summary = "清空浏览历史")
+    @SecurityRequirement(name = "BearerAuth")
     @DeleteMapping("/api/videos/views")
     public Result<Void> clearVideoViewHistory() {
         String userId = currentUserService.getCurrentUser().userId();

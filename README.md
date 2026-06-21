@@ -37,6 +37,10 @@ docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
 
 [http://localhost:8088](http://localhost:8088)
 
+在线接口文档：
+
+[http://localhost:8088/doc.html](http://localhost:8088/doc.html)
+
 停止服务：
 
 ```bash

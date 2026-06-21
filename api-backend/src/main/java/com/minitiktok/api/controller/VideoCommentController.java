@@ -9,6 +9,9 @@ import com.minitiktok.api.entity.VideoComment;
 import com.minitiktok.api.security.CurrentUser;
 import com.minitiktok.api.security.CurrentUserService;
 import com.minitiktok.api.service.VideoCommentService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,11 +22,13 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequiredArgsConstructor
+@Tag(name = "视频评论", description = "视频评论发布与查询")
 public class VideoCommentController {
 
     private final VideoCommentService videoCommentService;
     private final CurrentUserService currentUserService;
 
+    @Operation(summary = "查询视频评论")
     @GetMapping("/api/videos/{id}/comments")
     public Result<List<VideoCommentResponse>> listComments(@PathVariable("id") Long videoId) {
         List<VideoCommentResponse> comments = videoCommentService.listByVideoId(videoId).stream()
@@ -32,6 +37,8 @@ public class VideoCommentController {
         return Result.success(comments);
     }
 
+    @Operation(summary = "发表评论")
+    @SecurityRequirement(name = "BearerAuth")
     @PostMapping("/api/videos/{id}/comments")
     public Result<VideoCommentResponse> createComment(
             @PathVariable("id") Long videoId,

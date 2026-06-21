@@ -1,5 +1,7 @@
 package com.minitiktok.api.config;
 
+import static org.springframework.security.web.util.matcher.AntPathRequestMatcher.antMatcher;
+
 import java.util.Collection;
 
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -40,6 +42,13 @@ public class MockAuthSecurityConfig {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/health").permitAll()
+                        .requestMatchers(
+                                antMatcher("/doc.html"),
+                                antMatcher("/v3/api-docs"),
+                                antMatcher("/v3/api-docs/mini-tiktok-api"),
+                                antMatcher("/v3/api-docs/**"),
+                                antMatcher("/webjars/**"))
+                        .permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/me").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/videos/recommendations").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/videos/*").permitAll()
