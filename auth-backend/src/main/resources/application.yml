@@ -23,6 +23,14 @@ mybatis-plus:
   global-config:
     banner: false
 
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  group-configs:
+    - group: mini-tiktok-auth
+      paths-to-match: /**
+      packages-to-scan: com.minitiktok.auth.controller
+
 logging:
   level:
     root: info

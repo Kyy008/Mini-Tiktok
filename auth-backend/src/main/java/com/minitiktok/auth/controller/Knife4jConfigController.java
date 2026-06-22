@@ -1,4 +1,4 @@
-package com.minitiktok.api.controller;
+package com.minitiktok.auth.controller;
 
 import java.util.List;
 import java.util.Map;
@@ -16,13 +16,9 @@ public class Knife4jConfigController {
     public Map<String, Object> swaggerConfig() {
         return Map.of(
                 "configUrl", "/v3/api-docs/swagger-config",
-                "urls", List.of(
-                        Map.of(
-                                "name", "mini-tiktok-api",
-                                "url", "/v3/api-docs/mini-tiktok-api"),
-                        Map.of(
-                                "name", "mini-tiktok-auth",
-                                "url", "/auth/v3/api-docs/mini-tiktok-auth")),
+                "urls", List.of(Map.of(
+                        "name", "mini-tiktok-auth",
+                        "url", "/v3/api-docs/mini-tiktok-auth")),
                 "validatorUrl", "");
     }
 }
