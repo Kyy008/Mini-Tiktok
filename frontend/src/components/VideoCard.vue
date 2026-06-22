@@ -15,8 +15,13 @@
       @durationchange="onLoadedMetadata"
       @timeupdate="onTimeUpdate"
       @progress="onProgress"
-      @waiting="onWaiting"
       @playing="onPlaying"
+      @play="onPlaying"
+      @pause="onPause"
+      @waiting="onWaiting"
+      @canplay="onCanPlay"
+      @seeking="onWaiting"
+      @seeked="onCanPlay"
     />
 
     <transition name="fade">
@@ -82,7 +87,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { VideoItem } from '../api/types'
 import { resolveVideoPlaySource } from '../api/video'
 import ActionRail from './ActionRail.vue'
@@ -101,16 +106,17 @@ const bufferedEnd = ref(0)
 const isScrubbing = ref(false)
 const scrubRatio = ref(0)
 const isWaiting = ref(false)
+let progressFrameId = 0
 
 const displayProgressPercent = computed(() => {
-  const total = duration.value
+  const total = getKnownDuration()
   if (!Number.isFinite(total) || total <= 0) return 0
   const displayedTime = isScrubbing.value ? scrubRatio.value * total : currentTime.value
   return clamp((displayedTime / total) * 100, 0, 100)
 })
 
 const bufferedPercent = computed(() => {
-  const total = duration.value
+  const total = getKnownDuration()
   if (!Number.isFinite(total) || total <= 0) return 0
   return clamp((bufferedEnd.value / total) * 100, 0, 100)
 })
@@ -188,6 +194,7 @@ async function syncPlayback(active: boolean) {
     el.pause()
     playing.value = false
     isWaiting.value = false
+    stopProgressTicker()
     return
   }
 
@@ -197,12 +204,14 @@ async function syncPlayback(active: boolean) {
   try {
     await el.play()
     playing.value = true
+    startProgressTicker()
   } catch {
     if (!el.muted) {
       el.muted = true
       try {
         await el.play()
         playing.value = true
+        startProgressTicker()
         return
       } catch {
         // 保持下方统一失败状态。
@@ -215,18 +224,13 @@ async function syncPlayback(active: boolean) {
 function onLoadedMetadata() {
   const el = videoEl.value
   if (!el) return
-  duration.value = normalizeMediaTime(el.duration)
+  duration.value = readMediaDuration(el)
   currentTime.value = normalizeMediaTime(el.currentTime)
   updateBufferedProgress()
 }
 
 function onTimeUpdate() {
-  const el = videoEl.value
-  if (!el) return
-  if (!isScrubbing.value) {
-    currentTime.value = normalizeMediaTime(el.currentTime)
-  }
-  updateBufferedProgress()
+  syncProgressFromVideo()
 }
 
 function onProgress() {
@@ -242,7 +246,19 @@ function onWaiting() {
 function onPlaying() {
   playing.value = true
   isWaiting.value = false
-  onTimeUpdate()
+  startProgressTicker()
+  syncProgressFromVideo()
+}
+
+function onPause() {
+  playing.value = false
+  stopProgressTicker()
+  syncProgressFromVideo()
+}
+
+function onCanPlay() {
+  isWaiting.value = false
+  syncProgressFromVideo()
 }
 
 function startScrub(event: PointerEvent) {
@@ -277,7 +293,8 @@ function cancelScrub(event: PointerEvent) {
 }
 
 function canSeek() {
-  return Number.isFinite(duration.value) && duration.value > 0
+  const total = getKnownDuration()
+  return Number.isFinite(total) && total > 0
 }
 
 function updateScrubRatio(event: PointerEvent, target: HTMLElement) {
@@ -288,7 +305,7 @@ function updateScrubRatio(event: PointerEvent, target: HTMLElement) {
 
 function seekToRatio(ratio: number) {
   const el = videoEl.value
-  const total = duration.value
+  const total = getKnownDuration()
   if (!el || !Number.isFinite(total) || total <= 0) return
   const nextTime = clamp(ratio, 0, 1) * total
   el.currentTime = nextTime
@@ -304,9 +321,39 @@ function seekToRatio(ratio: number) {
   }
 }
 
+function syncProgressFromVideo() {
+  const el = videoEl.value
+  if (!el) return
+  duration.value = readMediaDuration(el)
+  if (!isScrubbing.value) {
+    currentTime.value = normalizeMediaTime(el.currentTime)
+  }
+  updateBufferedProgress()
+}
+
+function startProgressTicker() {
+  stopProgressTicker()
+  const tick = () => {
+    syncProgressFromVideo()
+    const el = videoEl.value
+    if (el && !el.paused && props.active) {
+      progressFrameId = window.requestAnimationFrame(tick)
+    }
+  }
+  progressFrameId = window.requestAnimationFrame(tick)
+}
+
+function stopProgressTicker() {
+  if (progressFrameId) {
+    window.cancelAnimationFrame(progressFrameId)
+    progressFrameId = 0
+  }
+}
+
 function updateBufferedProgress() {
   const el = videoEl.value
-  if (!el || !Number.isFinite(el.duration) || el.duration <= 0) {
+  const total = el ? readMediaDuration(el) : 0
+  if (!el || total <= 0) {
     bufferedEnd.value = 0
     return
   }
@@ -315,7 +362,7 @@ function updateBufferedProgress() {
   for (let index = 0; index < el.buffered.length; index += 1) {
     latestBufferedEnd = Math.max(latestBufferedEnd, el.buffered.end(index))
   }
-  bufferedEnd.value = clamp(latestBufferedEnd, 0, el.duration)
+  bufferedEnd.value = clamp(latestBufferedEnd, 0, total)
 }
 
 function resetProgressState() {
@@ -331,6 +378,21 @@ function normalizeMediaTime(value: number) {
   return Number.isFinite(value) && value > 0 ? value : 0
 }
 
+function readMediaDuration(el: HTMLVideoElement) {
+  if (Number.isFinite(el.duration) && el.duration > 0) {
+    return el.duration
+  }
+  if (el.seekable.length > 0) {
+    return normalizeMediaTime(el.seekable.end(el.seekable.length - 1))
+  }
+  return duration.value
+}
+
+function getKnownDuration() {
+  const el = videoEl.value
+  return el ? readMediaDuration(el) : duration.value
+}
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value))
 }
@@ -339,6 +401,10 @@ onMounted(() => {
   if (props.active) {
     void syncPlayback(true)
   }
+})
+
+onBeforeUnmount(() => {
+  stopProgressTicker()
 })
 </script>
 
@@ -383,11 +449,11 @@ onMounted(() => {
 
 .stream-progress {
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  left: 12px;
+  right: 72px;
+  bottom: 96px;
   z-index: 3;
-  height: 20px;
+  height: 28px;
   cursor: pointer;
   touch-action: none;
 }
@@ -396,10 +462,13 @@ onMounted(() => {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 0;
-  height: 3px;
-  background: rgba(255, 255, 255, 0.22);
+  top: 50%;
+  height: 5px;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.26);
   overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
 }
 
 .buffered-bar,
@@ -409,7 +478,7 @@ onMounted(() => {
   top: 0;
   bottom: 0;
   width: 0;
-  transition: width 0.12s linear;
+  transition: width 0.08s linear;
 }
 
 .buffered-bar {
@@ -422,14 +491,14 @@ onMounted(() => {
 
 .progress-thumb {
   position: absolute;
-  bottom: -3px;
-  width: 9px;
-  height: 9px;
+  top: 50%;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   background: #fff;
   box-shadow: 0 0 8px rgba(0, 0, 0, 0.35);
-  opacity: 0;
-  transform: translateX(-50%) scale(0.8);
+  opacity: 0.95;
+  transform: translate(-50%, -50%) scale(0.9);
   transition:
     opacity 0.16s,
     transform 0.16s;
@@ -438,18 +507,18 @@ onMounted(() => {
 .progress-thumb.show,
 .stream-progress:hover .progress-thumb {
   opacity: 1;
-  transform: translateX(-50%) scale(1);
+  transform: translate(-50%, -50%) scale(1.1);
 }
 
 .stream-progress:hover .progress-track,
 .stream-progress:active .progress-track {
-  height: 4px;
+  height: 6px;
 }
 
 .buffering {
   position: absolute;
   right: 10px;
-  bottom: 8px;
+  bottom: 24px;
   padding: 2px 6px;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.45);
