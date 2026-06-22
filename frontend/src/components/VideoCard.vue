@@ -11,6 +11,12 @@
       playsinline
       webkit-playsinline
       preload="metadata"
+      @loadedmetadata="onLoadedMetadata"
+      @durationchange="onLoadedMetadata"
+      @timeupdate="onTimeUpdate"
+      @progress="onProgress"
+      @waiting="onWaiting"
+      @playing="onPlaying"
     />
 
     <transition name="fade">
@@ -34,6 +40,32 @@
 
     <div class="bottom-gradient" />
 
+    <div
+      class="stream-progress"
+      role="slider"
+      aria-label="视频播放进度"
+      :aria-valuemin="0"
+      :aria-valuemax="100"
+      :aria-valuenow="Math.round(displayProgressPercent)"
+      @click.stop
+      @dblclick.stop
+      @pointerdown.stop.prevent="startScrub"
+      @pointermove.stop.prevent="moveScrub"
+      @pointerup.stop.prevent="finishScrub"
+      @pointercancel.stop.prevent="cancelScrub"
+    >
+      <div class="progress-track">
+        <div class="buffered-bar" :style="{ width: `${bufferedPercent}%` }" />
+        <div class="played-bar" :style="{ width: `${displayProgressPercent}%` }" />
+      </div>
+      <div
+        class="progress-thumb"
+        :class="{ show: isScrubbing }"
+        :style="{ left: `${displayProgressPercent}%` }"
+      />
+      <span v-if="isWaiting" class="buffering">缓冲中</span>
+    </div>
+
     <div class="info">
       <div class="author">@{{ video.author.username }}</div>
       <div class="title">{{ video.title }}</div>
@@ -50,7 +82,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import type { VideoItem } from '../api/types'
 import { resolveVideoPlaySource } from '../api/video'
 import ActionRail from './ActionRail.vue'
@@ -63,6 +95,25 @@ const playing = ref(false)
 const showHeart = ref(false)
 const heartStyle = ref<Record<string, string>>({})
 const playSource = ref(props.video.playUrl)
+const duration = ref(0)
+const currentTime = ref(0)
+const bufferedEnd = ref(0)
+const isScrubbing = ref(false)
+const scrubRatio = ref(0)
+const isWaiting = ref(false)
+
+const displayProgressPercent = computed(() => {
+  const total = duration.value
+  if (!Number.isFinite(total) || total <= 0) return 0
+  const displayedTime = isScrubbing.value ? scrubRatio.value * total : currentTime.value
+  return clamp((displayedTime / total) * 100, 0, 100)
+})
+
+const bufferedPercent = computed(() => {
+  const total = duration.value
+  if (!Number.isFinite(total) || total <= 0) return 0
+  return clamp((bufferedEnd.value / total) * 100, 0, 100)
+})
 
 watch(
   () => props.active,
@@ -74,6 +125,7 @@ watch(
 watch(
   () => props.video.playUrl,
   () => {
+    resetProgressState()
     void loadPlaySource()
   },
   { immediate: true },
@@ -135,10 +187,12 @@ async function syncPlayback(active: boolean) {
   if (!active) {
     el.pause()
     playing.value = false
+    isWaiting.value = false
     return
   }
 
   el.currentTime = 0
+  resetProgressState()
   el.muted = !props.soundEnabled
   try {
     await el.play()
@@ -156,6 +210,129 @@ async function syncPlayback(active: boolean) {
     }
     playing.value = false
   }
+}
+
+function onLoadedMetadata() {
+  const el = videoEl.value
+  if (!el) return
+  duration.value = normalizeMediaTime(el.duration)
+  currentTime.value = normalizeMediaTime(el.currentTime)
+  updateBufferedProgress()
+}
+
+function onTimeUpdate() {
+  const el = videoEl.value
+  if (!el) return
+  if (!isScrubbing.value) {
+    currentTime.value = normalizeMediaTime(el.currentTime)
+  }
+  updateBufferedProgress()
+}
+
+function onProgress() {
+  updateBufferedProgress()
+}
+
+function onWaiting() {
+  if (props.active) {
+    isWaiting.value = true
+  }
+}
+
+function onPlaying() {
+  playing.value = true
+  isWaiting.value = false
+  onTimeUpdate()
+}
+
+function startScrub(event: PointerEvent) {
+  if (!canSeek()) return
+  const target = event.currentTarget as HTMLElement
+  isScrubbing.value = true
+  target.setPointerCapture?.(event.pointerId)
+  updateScrubRatio(event, target)
+}
+
+function moveScrub(event: PointerEvent) {
+  if (!isScrubbing.value) return
+  updateScrubRatio(event, event.currentTarget as HTMLElement)
+}
+
+function finishScrub(event: PointerEvent) {
+  if (!isScrubbing.value) return
+  const target = event.currentTarget as HTMLElement
+  updateScrubRatio(event, target)
+  seekToRatio(scrubRatio.value)
+  target.releasePointerCapture?.(event.pointerId)
+  isScrubbing.value = false
+}
+
+function cancelScrub(event: PointerEvent) {
+  if (!isScrubbing.value) return
+  const target = event.currentTarget as HTMLElement
+  target.releasePointerCapture?.(event.pointerId)
+  isScrubbing.value = false
+  const total = duration.value
+  scrubRatio.value = total > 0 ? clamp(currentTime.value / total, 0, 1) : 0
+}
+
+function canSeek() {
+  return Number.isFinite(duration.value) && duration.value > 0
+}
+
+function updateScrubRatio(event: PointerEvent, target: HTMLElement) {
+  const rect = target.getBoundingClientRect()
+  if (rect.width <= 0) return
+  scrubRatio.value = clamp((event.clientX - rect.left) / rect.width, 0, 1)
+}
+
+function seekToRatio(ratio: number) {
+  const el = videoEl.value
+  const total = duration.value
+  if (!el || !Number.isFinite(total) || total <= 0) return
+  const nextTime = clamp(ratio, 0, 1) * total
+  el.currentTime = nextTime
+  currentTime.value = nextTime
+  if (props.active && el.paused) {
+    void el.play()
+      .then(() => {
+        playing.value = true
+      })
+      .catch(() => {
+        playing.value = false
+      })
+  }
+}
+
+function updateBufferedProgress() {
+  const el = videoEl.value
+  if (!el || !Number.isFinite(el.duration) || el.duration <= 0) {
+    bufferedEnd.value = 0
+    return
+  }
+
+  let latestBufferedEnd = 0
+  for (let index = 0; index < el.buffered.length; index += 1) {
+    latestBufferedEnd = Math.max(latestBufferedEnd, el.buffered.end(index))
+  }
+  bufferedEnd.value = clamp(latestBufferedEnd, 0, el.duration)
+}
+
+function resetProgressState() {
+  duration.value = 0
+  currentTime.value = 0
+  bufferedEnd.value = 0
+  isScrubbing.value = false
+  scrubRatio.value = 0
+  isWaiting.value = false
+}
+
+function normalizeMediaTime(value: number) {
+  return Number.isFinite(value) && value > 0 ? value : 0
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value))
 }
 
 onMounted(() => {
@@ -204,10 +381,89 @@ onMounted(() => {
   pointer-events: none;
 }
 
+.stream-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  height: 20px;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.progress-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.22);
+  overflow: hidden;
+}
+
+.buffered-bar,
+.played-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  transition: width 0.12s linear;
+}
+
+.buffered-bar {
+  background: rgba(255, 255, 255, 0.38);
+}
+
+.played-bar {
+  background: #fff;
+}
+
+.progress-thumb {
+  position: absolute;
+  bottom: -3px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  transform: translateX(-50%) scale(0.8);
+  transition:
+    opacity 0.16s,
+    transform 0.16s;
+}
+
+.progress-thumb.show,
+.stream-progress:hover .progress-thumb {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+}
+
+.stream-progress:hover .progress-track,
+.stream-progress:active .progress-track {
+  height: 4px;
+}
+
+.buffering {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.45);
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 11px;
+  line-height: 1.2;
+  pointer-events: none;
+}
+
 .info {
   position: absolute;
   left: 12px;
   bottom: 22px;
+  z-index: 2;
   width: 250px;
 }
 
